@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/**
+ * note: JANGAN PAKAI ENUM di Prisma
+ */
+
+model Subscription {
+  id             String        @id @default(uuid())
+  start          DateTime
+  plan           String        @default("TRIAL") // TRIAL, PRO
+  organizationId String?       @unique
+  organizations  Organization? @relation(fields: [organizationId], references: [name])
+}
+
+model Organization {
+  name                    String          @id @unique
+  subscriptionId          String?         @unique
+  subscription            Subscription?
+  accounts                User[]
+  cctvConfigs             CctvConfig[]
+  workstations            Workstation[]
+  scannerConfigs          ScannerConfig[]
+  invoiceScans            InvoiceScan[]
+  recordingMaxDurationSec Int             @default(300)
+}
+
+model Globalsetting {
+  settingName String   @id @default("default")
+  inUse       Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model User {
+  username             String          @id
+  passwordHash         String?
+  description          String?
+  role                 String          @default("ADMIN_GUDANG")
+  isActive             Boolean         @default(true)
+  displayName          String
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  mail                 String?         @unique
+  organizationName     String?
+  organization         Organization?   @relation(fields: [organizationName], references: [name], onDelete: SetNull)
+  assignedScanner      ScannerConfig?  @relation("assignedScanner")
+}
+
+model Workstation {
+  id               String          @id @default(uuid())
+  organizationName String
+  organization     Organization    @relation(fields: [organizationName], references: [name], onDelete: Cascade)
+  label            String
+  isActive         Boolean         @default(true)
+  lastSeenAt       DateTime?
+  scanners         ScannerConfig[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model ScannerConfig {
+  id               String        @id @default(uuid())
+  organizationName String
+  organization     Organization  @relation(fields: [organizationName], references: [name], onDelete: Cascade)
+  workstationId    String
+  workstation      Workstation   @relation(fields: [workstationId], references: [id], onDelete: Cascade)
+  label            String
+  assignedUsername String?       @unique
+  assignedUser     User?         @relation("assignedScanner", fields: [assignedUsername], references: [username], onDelete: SetNull)
+  cctvConfigId     String        @unique
+  cctvConfig       CctvConfig    @relation(fields: [cctvConfigId], references: [id], onDelete: Restrict)
+  baudRate         Int           @default(9600)
+  usbVendorId      Int?
+  usbProductId     Int?
+  isActive         Boolean       @default(true)
+  invoiceScans     InvoiceScan[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+model CctvConfig {
+  id               String         @id @default(uuid())
+  organizationName String
+  organization     Organization   @relation(fields: [organizationName], references: [name], onDelete: Cascade)
+  label            String
+  rtspUrl          String
+  username         String?
+  password         String?
+  isActive         Boolean        @default(true)
+  isOnline         Boolean        @default(false)
+  lastSeenAt       DateTime?
+  scannerConfig    ScannerConfig?
+  invoiceScans     InvoiceScan[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model InvoiceScan {
+  id                String         @id @default(uuid())
+  organizationName  String
+  organization      Organization   @relation(fields: [organizationName], references: [name], onDelete: Cascade)
+  invoiceNumber     String
+  scannedAt         DateTime       @default(now())
+  completedAt       DateTime?
+  videoPath         String?
+  status            String         @default("RECORDING")
+  previousInvoice   String?
+  scannerConfigId   String?
+  scannerConfig     ScannerConfig? @relation(fields: [scannerConfigId], references: [id], onDelete: SetNull)
+  cctvConfigId      String?
+  cctvConfig        CctvConfig?    @relation(fields: [cctvConfigId], references: [id])
+  scannedByUsername String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([organizationName, invoiceNumber])
+}
