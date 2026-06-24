@@ -10,21 +10,12 @@ import {
   Warehouse,
 } from "lucide-react";
 
-export const WHATSAPP_NUMBER =
-  import.meta.env.PUBLIC_WHATSAPP_NUMBER ?? "628888888888";
+export const WHATSAPP_NUMBER = import.meta.env.PUBLIC_WHATSAPP_NUMBER ?? "";
 
 export const whatsappConsultUrl = (message?: string) =>
   `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
-    message ?? "Halo, saya ingin konsultasi InvoTrack.",
+    message ?? "Halo, saya ingin konsultasi BuktiScan.",
   )}`;
-
-export function getBrandName(): string {
-  if (typeof window === "undefined") return "InvoTrack";
-  const host = window.location.hostname.split(".")[0];
-  return host
-    ? `${host.charAt(0).toUpperCase()}${host.slice(1)}Track`
-    : "InvoTrack";
-}
 
 export interface LandingFeature {
   title: string;
@@ -43,7 +34,7 @@ export const LANDING_FEATURES: LandingFeature[] = [
   {
     title: "Multi-scanner per PC kasir",
     description:
-      "Beberapa scanner USB di satu workstation via Web Serial. Cocok untuk gudang dengan banyak meja operator.",
+      "Beberapa scanner USB di satu workstation via BuktiScan Agent desktop. Cocok untuk gudang dengan banyak meja operator.",
     icon: ScanLine,
   },
   {
@@ -55,7 +46,7 @@ export const LANDING_FEATURES: LandingFeature[] = [
   {
     title: "Log scan real-time",
     description:
-      "Dashboard audit, live log, dan notifikasi WebSocket — pantau aktivitas gudang dari mana saja.",
+      "Log dan notifikasi WebSocket dari server kantor — pantau aktivitas gudang. File video tetap di disk PC kasir.",
     icon: ClipboardList,
   },
   {
@@ -67,9 +58,8 @@ export const LANDING_FEATURES: LandingFeature[] = [
   {
     title: "Simpan video offline",
     description:
-      "Ekspor dan simpan klip rekam di perangkat lokal Anda — akses bukti meski jaringan terputus.",
+      "Klip rekam disimpan di disk PC kasir via agent desktop — bukti visual tetap ada di lokasi toko.",
     icon: HardDrive,
-    comingSoon: true,
   },
 ];
 
@@ -82,32 +72,32 @@ export const HOW_IT_WORKS_STEPS = [
   },
   {
     step: 2,
-    title: "Hubungkan scanner",
+    title: "Install agent",
     description:
-      "Operator buka halaman Scan di PC kasir, klik Hubungkan USB, pilih port COM scanner.",
+      "Download BuktiScan Agent di PC kasir, pairing dengan kode dari dashboard admin.",
   },
   {
     step: 3,
-    title: "Scan invoice",
+    title: "Pair USB & tes kamera",
     description:
-      "Scan barcode — sistem otomatis mulai rekam CCTV operator yang di-assign.",
+      "Di BuktiScan Agent: pilih port COM scanner (VCOM), pair USB, lalu tes preview RTSP. Setelah terhubung, scan barcode otomatis mulai rekam CCTV.",
   },
   {
     step: 4,
     title: "Tinjau & audit",
     description:
-      "Lihat log scan, status rekam, dan video di dashboard. Ekspor offline segera hadir.",
+      "Lihat log scan dan status rekam di dashboard. Video tersimpan di disk PC kasir. Putar rekaman di Scan Log dari browser yang jalan di PC kasir yang sama dengan agent.",
   },
 ];
 
 export const LANDING_BENEFITS = [
-  "Bukti visual per transaksi gudang — kurangi sengketa dan klaim",
+  "Bukti visual per transaksi untuk audit internal gudang",
   "Routing scan via scannerConfig, bukan user login — konsisten di shift berganti",
-  "Multi-meja kasir dalam satu PC tanpa bentrok port scanner",
-  "Deploy on-premise — data dan stream CCTV di infrastruktur Anda",
+  "Beberapa meja operator (scanner + CCTV + petugas) dalam satu workstation — agent satu, tanpa bentrok USB",
+  "Video tersimpan di PC meja kasir, metadata log di server kantor",
 ];
 
-export const HERO_PILLS = ["Multi-scanner", "On-premise", "Audit real-time"];
+export const HERO_PILLS = ["Multi-scanner", "Rekam lokal", "Audit real-time"];
 
 export interface LandingRole {
   title: string;
@@ -136,21 +126,21 @@ export const LANDING_ROLES: LandingRole[] = [
     icon: Warehouse,
     capabilities: [
       "Kelola perangkat & CCTV",
-      "Live preview kamera",
-      "Pantau scan log & status",
+      "Pantau status perangkat & log",
+      "Preview kamera lewat agent di lokasi",
       "Akses dashboard operasional",
     ],
   },
   {
     title: "Operator",
     description:
-      "Petugas di meja kasir — scan invoice dan rekam otomatis via scanner yang di-assign.",
+      "Petugas di meja gudang — scan via scanner yang di-assign; rekam CCTV otomatis lewat agent di PC workstation.",
     icon: ScanLine,
     capabilities: [
-      "Halaman scan multi-scanner",
-      "Hubungkan USB scanner",
-      "Stop rekam milik sendiri",
-      "Lihat log aktivitas scan",
+      "Scan barcode di meja (via agent, tanpa buka browser)",
+      "Lihat log scan di dashboard",
+      "Stop rekam transaksi sendiri dari Scan Log",
+      "Tanpa login untuk scan — routing via scannerConfig",
     ],
   },
 ];
@@ -179,7 +169,7 @@ export const LANDING_PLANS: LandingPlan[] = [
       "Log scan & dashboard",
     ],
     ctaLabel: "Coba Trial",
-    ctaMessage: "Halo, saya ingin coba Trial InvoTrack.",
+    ctaMessage: "Halo, saya ingin coba Trial BuktiScan.",
   },
   {
     id: "pro",
@@ -194,7 +184,7 @@ export const LANDING_PLANS: LandingPlan[] = [
       "Prioritas dukungan setup",
     ],
     ctaLabel: "Tanya Paket Pro",
-    ctaMessage: "Halo, saya ingin info paket Pro InvoTrack.",
+    ctaMessage: "Halo, saya ingin info paket Pro BuktiScan.",
     ctaPrimary: true,
   },
 ];

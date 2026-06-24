@@ -1,15 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import {
-  Camera,
-  ClipboardList,
-  Radio,
-  type LucideIcon,
-} from "lucide-react";
+import { Camera, ClipboardList, Radio, type LucideIcon } from "lucide-react";
 import DashboardFrame from "@/components/islands/DashboardFrame";
 import DeviceStatusPanel from "@/components/islands/DeviceStatusPanel";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { InvoTrackApi } from "@/api/invo-track";
+import { BuktiScanApi } from "@/api/invo-track";
 import { OrganizationApi } from "@/api/organization";
 import { scanDuration } from "@/lib/scan-utils";
 import type { InvoiceScan, LandingStats } from "@/types/invo-track";
@@ -41,7 +36,7 @@ function DashboardHomeContent() {
   const { data: devices } = useQuery({
     queryKey: ["device-status"],
     queryFn: async () => {
-      const res = await InvoTrackApi.deviceStatus();
+      const res = await BuktiScanApi.deviceStatus();
       return res.data as { cctv: { isOnline: boolean }[] };
     },
   });
@@ -49,7 +44,7 @@ function DashboardHomeContent() {
   const { data: scans, isLoading: scansLoading } = useQuery({
     queryKey: ["dashboard-summary", "recent-scans"],
     queryFn: async () => {
-      const res = await InvoTrackApi.scanList({ page: 1, limit: 5 });
+      const res = await BuktiScanApi.scanList({ page: 1, limit: 5 });
       return res.data as { items: InvoiceScan[]; total: number };
     },
     refetchInterval: 30000,
@@ -58,7 +53,7 @@ function DashboardHomeContent() {
   const { data: active = [] } = useQuery({
     queryKey: ["active-recordings"],
     queryFn: async () => {
-      const res = await InvoTrackApi.activeRecordings();
+      const res = await BuktiScanApi.activeRecordings();
       return res.data as { invoiceNumber: string }[];
     },
     refetchInterval: 5000,
@@ -80,7 +75,10 @@ function DashboardHomeContent() {
                 Monitor aktivitas scan, rekam CCTV, dan status perangkat gudang
               </p>
             </div>
-            <a href="/dashboard/scan" className="btn btn-lg bg-base-100 text-primary border-0 shadow-md hover:shadow-lg">
+            <a
+              href="/dashboard/scan"
+              className="btn btn-lg bg-base-100 text-primary border-0 shadow-md hover:shadow-lg"
+            >
               Mulai Scan
             </a>
           </div>
@@ -113,9 +111,13 @@ function DashboardHomeContent() {
         <div className="px-6 py-5 border-b border-base-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h2 className="text-lg md:text-xl font-bold">Scan Terbaru</h2>
-            <p className="text-sm text-base-content/60 mt-1">5 scan invoice terakhir</p>
+            <p className="text-sm text-base-content/60 mt-1">
+              5 scan invoice terakhir
+            </p>
           </div>
-          <span className="badge badge-ghost badge-sm">Auto refresh 30 detik</span>
+          <span className="badge badge-ghost badge-sm">
+            Auto refresh 30 detik
+          </span>
         </div>
 
         <div className="overflow-x-auto">
@@ -127,7 +129,9 @@ function DashboardHomeContent() {
           ) : (scans?.items.length ?? 0) === 0 ? (
             <div className="p-12 text-center text-base-content/60">
               <p className="font-semibold text-base-content">Belum ada scan</p>
-              <p className="text-sm mt-1">Mulai scan invoice dari halaman Scan.</p>
+              <p className="text-sm mt-1">
+                Mulai scan invoice dari halaman Scan.
+              </p>
             </div>
           ) : (
             <table className="table table-sm">
@@ -142,12 +146,16 @@ function DashboardHomeContent() {
               <tbody>
                 {scans?.items.map((row) => (
                   <tr key={row.id} className="hover">
-                    <td className="font-mono font-medium">{row.invoiceNumber}</td>
+                    <td className="font-mono font-medium">
+                      {row.invoiceNumber}
+                    </td>
                     <td>
                       <StatusBadge status={row.status} />
                     </td>
                     <td className="font-mono text-sm">{scanDuration(row)}</td>
-                    <td className="text-sm">{row.scannerConfig?.label ?? "—"}</td>
+                    <td className="text-sm">
+                      {row.scannerConfig?.label ?? "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -156,7 +164,10 @@ function DashboardHomeContent() {
         </div>
 
         <div className="px-6 py-4 border-t border-base-300 bg-base-200/50">
-          <a href="/dashboard/scan-log" className="link link-primary text-sm font-medium">
+          <a
+            href="/dashboard/scan-log"
+            className="link link-primary text-sm font-medium"
+          >
             Lihat semua scan log →
           </a>
         </div>
@@ -205,11 +216,15 @@ function HomeStatCard({
   }[tone];
 
   return (
-    <div className={`rounded-xl border p-5 transition-shadow hover:shadow-md ${toneRing}`}>
+    <div
+      className={`rounded-xl border p-5 transition-shadow hover:shadow-md ${toneRing}`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-base-content/70">{label}</p>
-          <p className="text-2xl md:text-3xl font-bold mt-1 tabular-nums">{value}</p>
+          <p className="text-2xl md:text-3xl font-bold mt-1 tabular-nums">
+            {value}
+          </p>
           {hint && <p className="text-xs text-base-content/50 mt-2">{hint}</p>}
         </div>
         <div className={`p-2.5 rounded-xl shrink-0 ${iconTone}`}>

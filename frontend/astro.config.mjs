@@ -19,6 +19,9 @@ export default defineConfig({
     host: true,
   },
   vite: {
+    define: {
+      __API_PROXY_TARGET__: JSON.stringify(apiTarget),
+    },
     resolve: {
       alias: { '@': path.resolve(__dirname, './src') },
     },

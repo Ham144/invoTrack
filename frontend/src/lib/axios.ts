@@ -23,7 +23,7 @@ function runRefresh(): Promise<boolean> {
       baseURL: BASE_URL || undefined,
       timeout: 15000,
     })
-    .then((res) => res.status === 200)
+    .then((res) => res.status >= 200 && res.status < 300)
     .catch(() => false)
     .finally(() => {
       refreshPromise = null;
@@ -42,7 +42,7 @@ axiosInstance.interceptors.response.use(
     const isForbiddenError = error.response?.status === 403;
     const requestUrl = originalRequest.url || '';
     const isPublicRoute =
-      requestUrl.includes('/api/user/login/') ||
+      requestUrl.includes('/api/user/login') ||
       requestUrl.includes('/api/user/refresh-token');
 
     if (isAuthError && !originalRequest._retry && !isPublicRoute) {

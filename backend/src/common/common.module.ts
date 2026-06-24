@@ -29,6 +29,8 @@ export class CommonModule implements NestModule {
         { path: '/api/user/login', method: RequestMethod.POST },
         { path: '/api/user/refresh-token', method: RequestMethod.POST },
         { path: '/api/organization/landing-page', method: RequestMethod.GET },
+        { path: '/api/agent/pair', method: RequestMethod.POST },
+        { path: '/api/agent/(.*)', method: RequestMethod.ALL },
       )
       .forRoutes('*');
   }

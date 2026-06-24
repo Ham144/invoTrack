@@ -1,7 +1,7 @@
 import axiosInstance from "@/lib/axios";
 import type { ScanStatusFilter } from "@/types/invo-track";
 
-export const InvoTrackApi = {
+export const BuktiScanApi = {
   scanList: (params?: {
     page?: number;
     limit?: number;
@@ -12,32 +12,22 @@ export const InvoTrackApi = {
       params: {
         page: params?.page ?? 1,
         limit: params?.limit ?? 20,
-        status: params?.status && params.status !== "ALL" ? params.status : undefined,
+        status:
+          params?.status && params.status !== "ALL" ? params.status : undefined,
         search: params?.search || undefined,
       },
     }),
   scanFind: (invoiceNumber: string) =>
     axiosInstance.get(`/api/invoice-scan/${encodeURIComponent(invoiceNumber)}`),
-  ingestScanner: (scannerConfigId: string, invoiceNumber: string) =>
-    axiosInstance.post("/api/invoice-scan/ingest/scanner", {
-      scannerConfigId,
-      invoiceNumber,
-    }),
   deviceStatus: () => axiosInstance.get("/api/invo-track/devices/status"),
   activeRecordings: (params?: {
     cctvConfigId?: string;
     scannerConfigId?: string;
-  }) =>
-    axiosInstance.get("/api/invo-track/recording/active", { params }),
+  }) => axiosInstance.get("/api/invo-track/recording/active", { params }),
   stopRecording: (scanId: string) =>
     axiosInstance.post(`/api/invo-track/recording/${scanId}/stop`),
   cctvList: () => axiosInstance.get("/api/cctv-config"),
   cctvQuota: () => axiosInstance.get("/api/cctv-config/quota"),
-  cctvSnapshot: (id: string) =>
-    axiosInstance.get(`/api/cctv-config/${id}/snapshot`, {
-      responseType: "blob",
-      timeout: 25_000,
-    }),
   cctvCreate: (body: Record<string, unknown>) =>
     axiosInstance.post("/api/cctv-config", body),
   cctvUpdate: (id: string, body: Record<string, unknown>) =>
@@ -65,4 +55,8 @@ export const InvoTrackApi = {
     axiosInstance.patch(`/api/scanner-config/${id}`, body),
   scannerDelete: (id: string) =>
     axiosInstance.delete(`/api/scanner-config/${id}`),
+  agentGeneratePairingCode: (workstationId: string) =>
+    axiosInstance.post(`/api/workstation/${workstationId}/agent/pairing-code`),
+  agentStatus: (workstationId: string) =>
+    axiosInstance.get(`/api/workstation/${workstationId}/agent/status`),
 };

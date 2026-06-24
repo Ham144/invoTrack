@@ -7,7 +7,7 @@ export default function ScanLogPage() {
     <DashboardFrame>
       <PageHeader
         title="Scan Log"
-        subtitle="Audit trail semua scan invoice — durasi rekam, status, dan putar video."
+        subtitle="Metadata scan dari cloud — video lokal disinkronkan oleh agent di PC kasir."
       />
       <LiveScanLog />
     </DashboardFrame>

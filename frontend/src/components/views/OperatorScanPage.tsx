@@ -6,8 +6,8 @@ export default function OperatorScanPage() {
   return (
     <DashboardFrame>
       <PageHeader
-        title="Scan Invoice"
-        subtitle="Scan barcode invoice untuk memulai atau melanjutkan rekam CCTV packing."
+        title="BuktiScan Agent"
+        subtitle="Atur pairing dan status agent desktop di PC kasir. Scan barcode, preview CCTV, dan pair USB dilakukan di aplikasi agent — bukan di sini."
       />
       <OperatorScanPanel />
     </DashboardFrame>

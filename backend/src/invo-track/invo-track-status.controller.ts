@@ -6,7 +6,7 @@ import { TokenPayload } from 'src/user/dto/token-payload.dto';
 import { Authorization } from 'src/common/authorization.decorator';
 
 @Controller('invo-track')
-export class InvoTrackStatusController {
+export class BuktiScanStatusController {
   constructor(
     private readonly deviceHealth: DeviceHealthService,
     private readonly invoiceScan: InvoiceScanService,

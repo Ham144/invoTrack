@@ -13,7 +13,6 @@ import { TokenPayload } from './dto/token-payload.dto';
 import { plainToInstance } from 'class-transformer';
 import * as bcrypt from 'bcrypt';
 import { ROLE } from 'src/common/shared-enum';
-import { Prisma } from '@prisma/client';
 
 function normalizeUsername(input: string): string {
   const raw = input.trim();
@@ -34,31 +33,6 @@ export class AuthService {
   ) {}
 
   async login(body: LoginRequestDto, req: any) {
-    // #region agent log
-    const userModelFields = Prisma.dmmf.datamodel.models
-      .find((m) => m.name === 'User')
-      ?.fields.map((f) => f.name);
-    fetch('http://localhost:7525/ingest/56fe92df-f231-454d-96a6-16be82610eed', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': '92cfd8',
-      },
-      body: JSON.stringify({
-        sessionId: '92cfd8',
-        runId: 'pre-fix',
-        hypothesisId: 'A',
-        location: 'auth.service.ts:login:entry',
-        message: 'login attempt - prisma User model fields',
-        data: {
-          userModelFields,
-          hasStaleField: userModelFields?.includes('currentCctvConfigId'),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
     let user;
     try {
       user = await this.prismaService.user.findFirst({
@@ -70,53 +44,7 @@ export class AuthService {
         },
         include: { organization: true },
       });
-      // #region agent log
-      fetch(
-        'http://localhost:7525/ingest/56fe92df-f231-454d-96a6-16be82610eed',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Debug-Session-Id': '92cfd8',
-          },
-          body: JSON.stringify({
-            sessionId: '92cfd8',
-            runId: 'pre-fix',
-            hypothesisId: 'B',
-            location: 'auth.service.ts:login:success',
-            message: 'findFirst succeeded',
-            data: { found: Boolean(user), username: user?.username },
-            timestamp: Date.now(),
-          }),
-        },
-      ).catch(() => {});
-      // #endregion
     } catch (err: unknown) {
-      // #region agent log
-      fetch(
-        'http://localhost:7525/ingest/56fe92df-f231-454d-96a6-16be82610eed',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Debug-Session-Id': '92cfd8',
-          },
-          body: JSON.stringify({
-            sessionId: '92cfd8',
-            runId: 'pre-fix',
-            hypothesisId: 'C',
-            location: 'auth.service.ts:login:error',
-            message: 'findFirst failed',
-            data: {
-              errorName: err instanceof Error ? err.name : 'unknown',
-              errorMessage:
-                err instanceof Error ? err.message : String(err),
-            },
-            timestamp: Date.now(),
-          }),
-        },
-      ).catch(() => {});
-      // #endregion
       throw err;
     }
 

@@ -1,39 +1,43 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { Copy, Download, Monitor, Radio, ScanLine } from "lucide-react";
 import { toast } from "sonner";
-import { Circle, Plug, Square, Unplug } from "lucide-react";
-import { InvoTrackApi } from "@/api/invo-track";
-import { extractApiErrorMessage } from "@/lib/api-error";
-import { getSerialSupportStatus } from "@/lib/serial-support";
-import { useSerialScanners } from "@/lib/use-serial-scanners";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { BuktiScanApi } from "@/api/invo-track";
 import type {
-  ActiveRecording,
-  InvoiceScan,
-  ScannerConfig,
+  AgentPairingResult,
+  AgentStatus,
   Workstation,
 } from "@/types/invo-track";
+import {
+  AGENT_DOWNLOAD_HINT,
+  AGENT_DOWNLOAD_LABEL,
+  AGENT_DOWNLOAD_URL,
+} from "@/lib/agent-download";
 
-const WS_STORAGE_KEY = "invotrack-active-workstation";
+const WS_STORAGE_KEY = "BuktiScan-active-workstation";
 
-function formatCountdown(sec: number) {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+function formatLastSeen(iso?: string | null) {
+  if (!iso) return "Belum pernah";
+  return new Date(iso).toLocaleString("id-ID");
+}
+
+async function copyText(label: string, value: string) {
+  try {
+    await navigator.clipboard.writeText(value);
+    toast.success(`${label} disalin`);
+  } catch {
+    toast.error(`Gagal menyalin ${label}`);
+  }
 }
 
 export default function OperatorScanPanel() {
   const [workstationId, setWorkstationId] = useState("");
-  const [manualScannerId, setManualScannerId] = useState("");
-  const [manualInvoice, setManualInvoice] = useState("");
-  const [stopTarget, setStopTarget] = useState<ActiveRecording | null>(null);
-  const [, tick] = useState(0);
   const qc = useQueryClient();
 
   const workstations = useQuery({
     queryKey: ["workstations"],
     queryFn: async () => {
-      const res = await InvoTrackApi.workstationList();
+      const res = await BuktiScanApi.workstationList();
       return res.data as Workstation[];
     },
   });
@@ -52,153 +56,30 @@ export default function OperatorScanPanel() {
     if (workstationId) localStorage.setItem(WS_STORAGE_KEY, workstationId);
   }, [workstationId]);
 
-  const scanners = useQuery({
-    queryKey: ["scanner-config", workstationId],
+  const agentStatus = useQuery({
+    queryKey: ["agent-status", workstationId],
     queryFn: async () => {
-      const res = await InvoTrackApi.scannerList(workstationId);
-      return res.data as ScannerConfig[];
+      const res = await BuktiScanApi.agentStatus(workstationId);
+      return res.data as AgentStatus;
     },
     enabled: Boolean(workstationId),
+    refetchInterval: 15_000,
   });
 
-  const scannerList = scanners.data ?? [];
-
-  useEffect(() => {
-    if (!manualScannerId && scannerList.length === 1) {
-      setManualScannerId(scannerList[0].id);
-    }
-  }, [scannerList, manualScannerId]);
-
-  const activeRecordings = useQuery({
-    queryKey: ["active-recordings", workstationId],
-    queryFn: async () => {
-      const res = await InvoTrackApi.activeRecordings();
-      return res.data as ActiveRecording[];
-    },
-    refetchInterval: 5000,
-  });
-
-  const ingest = useMutation({
-    mutationFn: async ({
-      scannerConfigId,
-      invoiceNumber,
-    }: {
-      scannerConfigId: string;
-      invoiceNumber: string;
-    }) => {
-      const res = await InvoTrackApi.ingestScanner(
-        scannerConfigId,
-        invoiceNumber,
-      );
-      return res.data as InvoiceScan;
-    },
-    onSuccess: (scan) => {
-      qc.invalidateQueries({ queryKey: ["scan-log"] });
-      qc.invalidateQueries({ queryKey: ["device-status"] });
-      qc.invalidateQueries({ queryKey: ["active-recordings"] });
-      qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
-
-      const closed = scan.previousInvoice;
-      const current = scan.invoiceNumber;
-      if (closed) {
-        toast.success(`${closed} selesai → rekam ${current}`);
-      } else {
-        toast.success(`Mulai rekam ${current}`);
-      }
-    },
-    onError: async (err: unknown) => {
-      toast.error(await extractApiErrorMessage(err, "Scan gagal"));
-    },
-  });
-
-  const handleIngest = useCallback(
-    (scannerConfigId: string, invoiceNumber: string) => {
-      // #region agent log
-      fetch(
-        "http://localhost:7525/ingest/56fe92df-f231-454d-96a6-16be82610eed",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "92cfd8",
-          },
-          body: JSON.stringify({
-            sessionId: "92cfd8",
-            runId: "serial-read",
-            hypothesisId: "E",
-            location: "OperatorScanPanel.tsx:handleIngest",
-            message: "handleIngest called",
-            data: {
-              scannerConfigId,
-              invoiceLen: invoiceNumber.trim().length,
-              isPending: ingest.isPending,
-              willMutate: Boolean(
-                invoiceNumber.trim() && !ingest.isPending,
-              ),
-            },
-            timestamp: Date.now(),
-          }),
-        },
-      ).catch(() => {});
-      // #endregion
-      if (!invoiceNumber.trim() || ingest.isPending) return;
-      ingest.mutate({
-        scannerConfigId,
-        invoiceNumber: invoiceNumber.trim().toUpperCase(),
-      });
-    },
-    [ingest],
-  );
-
-  const serialStatus = getSerialSupportStatus();
-  const { sessions, connect, disconnect, serialSupported } = useSerialScanners(
-    scannerList,
-    handleIngest,
-  );
-
-  const stopRecording = useMutation({
-    mutationFn: async (scanId: string) => {
-      await InvoTrackApi.stopRecording(scanId);
+  const generatePairing = useMutation({
+    mutationFn: async () => {
+      const res = await BuktiScanApi.agentGeneratePairingCode(workstationId);
+      return res.data as AgentPairingResult;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["active-recordings"] });
-      qc.invalidateQueries({ queryKey: ["scan-log"] });
-      qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
-      setStopTarget(null);
-      toast.success("Rekam dihentikan");
-    },
-    onError: async (err: unknown) => {
-      toast.error(await extractApiErrorMessage(err, "Gagal stop rekam"));
+      qc.invalidateQueries({ queryKey: ["agent-status", workstationId] });
+      qc.invalidateQueries({ queryKey: ["workstations"] });
     },
   });
 
-  useEffect(() => {
-    const id = window.setInterval(() => tick((n) => n + 1), 1000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  useEffect(() => {
-    if (!workstationId) return;
-    const sendHeartbeat = () => {
-      InvoTrackApi.workstationHeartbeat(workstationId).catch(() => {});
-    };
-    sendHeartbeat();
-    const id = window.setInterval(sendHeartbeat, 60_000);
-    return () => window.clearInterval(id);
-  }, [workstationId]);
-
-  useEffect(() => {
-    const handler = () => {
-      qc.invalidateQueries({ queryKey: ["active-recordings"] });
-    };
-    window.addEventListener("scan-log-update", handler);
-    return () => window.removeEventListener("scan-log-update", handler);
-  }, [qc]);
-
-  const activeByScanner = new Map<string, ActiveRecording>();
-  for (const row of activeRecordings.data ?? []) {
-    if (row.scannerConfigId) activeByScanner.set(row.scannerConfigId, row);
-  }
+  const status = agentStatus.data;
+  const pairing = generatePairing.data;
+  const activeWs = wsList.find((w) => w.id === workstationId);
 
   if (workstations.isLoading) {
     return <div className="skeleton h-48 w-full rounded-xl" />;
@@ -224,11 +105,20 @@ export default function OperatorScanPanel() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl">
+      <div className="alert alert-info">
+        <div>
+          <p className="font-semibold">Halaman ini: install + pairing agent</p>
+          <p className="text-sm mt-1">
+            Scan barcode, preview CCTV, dan pair USB scanner dilakukan di
+            aplikasi <strong>BuktiScan Agent</strong> di PC kasir — bukan di
+            browser.
+          </p>
+        </div>
+      </div>
+
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <label className="text-sm font-medium shrink-0">
-          Workstation aktif
-        </label>
+        <label className="text-sm font-medium shrink-0">Workstation</label>
         <select
           className="select select-bordered select-sm max-w-md"
           value={workstationId}
@@ -240,203 +130,188 @@ export default function OperatorScanPanel() {
             </option>
           ))}
         </select>
-        {!serialSupported && (
-          <span
-            className="badge badge-warning badge-sm max-w-md whitespace-normal h-auto py-2"
-            title={serialStatus.message}
-          >
-            {serialStatus.message}
-          </span>
-        )}
       </div>
 
-      {scannerList.length === 0 ? (
-        <div className="alert alert-info max-w-2xl">
-          <p className="text-sm">
-            Workstation ini belum punya scanner. Admin perlu menambahkan di tab
-            Workstation & Scanner.
+      <div className="card bg-base-100 border border-base-300">
+        <div className="card-body gap-4">
+          <div className="flex items-center gap-2">
+            <Download className="w-5 h-5 text-primary" />
+            <h2 className="font-semibold">1. Download & install agent</h2>
+          </div>
+          <p className="text-sm text-base-content/70">
+            Download ZIP portable (~220 MB), ekstrak, lalu jalankan{" "}
+            <span className="font-mono">BuktiScan Agent.exe</span> di dalam
+            folder. {AGENT_DOWNLOAD_HINT}
           </p>
+          <a
+            href={AGENT_DOWNLOAD_URL}
+            className="btn btn-primary btn-sm w-fit gap-2 text-white"
+            download
+          >
+            <Download className="w-4 h-4" />
+            {AGENT_DOWNLOAD_LABEL}
+          </a>
         </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {scannerList.map((scanner) => {
-            const session = sessions[scanner.id];
-            const active = activeByScanner.get(scanner.id);
-            const remaining =
-              active && active.maxDurationSec > 0
-                ? Math.max(
-                    0,
-                    active.maxDurationSec -
-                      Math.floor(
-                        (Date.now() - new Date(active.scannedAt).getTime()) /
-                          1000,
-                      ),
-                  )
-                : null;
+      </div>
 
-            return (
-              <div
-                key={scanner.id}
-                className="card bg-base-100 border border-base-300"
-              >
-                <div className="card-body gap-3 p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-semibold">{scanner.label}</p>
-                      <p className="text-xs text-base-content/60">
-                        {scanner.assignedUser?.displayName ?? "—"} ·{" "}
-                        {scanner.cctvConfig?.label ?? "—"}
-                      </p>
-                    </div>
-                    <span
-                      className={`badge badge-sm ${
-                        session?.state === "connected"
-                          ? "badge-success"
-                          : session?.state === "error"
-                            ? "badge-error"
-                            : "badge-ghost"
-                      }`}
-                    >
-                      {session?.state === "connected"
-                        ? "Serial OK"
-                        : session?.state === "connecting"
-                          ? "Menghubungkan..."
-                          : session?.state === "error"
-                            ? "Error"
-                            : "Offline"}
-                    </span>
-                  </div>
+      <div className="card bg-base-100 border border-base-300">
+        <div className="card-body gap-4">
+          <div className="flex items-center gap-2">
+            <Radio className="w-5 h-5 text-primary" />
+            <h2 className="font-semibold">2. Pairing ke workstation</h2>
+          </div>
+          <p className="text-sm text-base-content/70">
+            Generate kode di bawah, lalu masukkan{" "}
+            <strong>Workstation ID</strong> dan kode pairing di aplikasi agent
+            (berlaku 15 menit). ID ini bukan rahasia — hanya penanda PC kasir
+            mana yang dipasangkan.
+          </p>
 
-                  {active && (
-                    <div className="alert alert-warning py-2 min-h-0">
-                      <div className="flex-1 text-sm">
-                        <p className="font-medium flex items-center gap-2">
-                          <Circle className="w-2 h-2 fill-error text-error animate-pulse" />
-                          {active.invoiceNumber}
-                        </p>
-                        {remaining !== null && (
-                          <p className="font-mono text-xs mt-1">
-                            Sisa {formatCountdown(remaining)}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        className="btn btn-xs btn-error btn-outline"
-                        onClick={() => setStopTarget(active)}
-                      >
-                        <Square className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
-
-                  {session?.lastBarcode && (
-                    <p className="text-xs font-mono text-base-content/50">
-                      Terakhir: {session.lastBarcode}
-                    </p>
-                  )}
-
-                  {session?.error && (
-                    <p className="text-xs text-error">{session.error}</p>
-                  )}
-
-                  <div className="flex gap-2">
-                    {session?.state === "connected" ? (
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline gap-1"
-                        onClick={() => disconnect(scanner.id)}
-                      >
-                        <Unplug className="w-4 h-4" />
-                        Putus
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-primary gap-1"
-                        disabled={!serialSupported}
-                        onClick={() => connect(scanner)}
-                      >
-                        <Plug className="w-4 h-4" />
-                        Hubungkan USB
-                      </button>
-                    )}
-                  </div>
+          {activeWs && (
+            <div className="bg-base-200 rounded-lg p-4 space-y-3">
+              <div>
+                <p className="text-xs text-base-content/60">Workstation</p>
+                <p className="font-medium">{activeWs.label}</p>
+              </div>
+              <div>
+                <p className="text-xs text-base-content/60">Workstation ID</p>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <code className="text-xs font-mono break-all">
+                    {workstationId}
+                  </code>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-ghost gap-1"
+                    onClick={() =>
+                      void copyText("Workstation ID", workstationId)
+                    }
+                  >
+                    <Copy className="w-3 h-3" />
+                    Salin
+                  </button>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+            </div>
+          )}
 
-      <div className="card bg-base-100 border border-base-300 border-dashed">
-        <div className="card-body gap-3 p-4">
-          <p className="text-xs text-base-content/60">
-            Mode Virtual COM tidak mengetik ke keyboard. Hubungkan USB di kartu
-            scanner di atas, lalu scan barcode — data masuk otomatis lewat
-            serial. Input manual di bawah hanya untuk uji tanpa hardware.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <select
-              className="select select-bordered select-sm"
-              value={manualScannerId}
-              onChange={(e) => setManualScannerId(e.target.value)}
-            >
-              <option value="">Pilih scanner</option>
-              {scannerList.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-            <input
-              className="input input-bordered input-sm font-mono flex-1"
-              placeholder="Nomor invoice"
-              value={manualInvoice}
-              onChange={(e) => setManualInvoice(e.target.value)}
-              onKeyDown={(e) => {
-                if (
-                  e.key === "Enter" &&
-                  manualScannerId &&
-                  manualInvoice.trim()
-                ) {
-                  handleIngest(manualScannerId, manualInvoice);
-                  setManualInvoice("");
-                }
-              }}
-            />
-            <button
-              type="button"
-              className="btn btn-sm btn-outline"
-              disabled={
-                !manualScannerId || !manualInvoice.trim() || ingest.isPending
-              }
-              onClick={() => {
-                handleIngest(manualScannerId, manualInvoice);
-                setManualInvoice("");
-              }}
-            >
-              Scan
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm w-fit"
+            disabled={!workstationId || generatePairing.isPending}
+            onClick={() => generatePairing.mutate()}
+          >
+            Generate kode pairing
+          </button>
+          {pairing && pairing.workstationId === workstationId && (
+            <div className="bg-base-200 rounded-lg p-4 space-y-3 border border-primary/20">
+              <p className="text-xs font-medium text-primary">
+                Salin ke aplikasi agent di PC kasir
+              </p>
+              <div>
+                <p className="text-xs text-base-content/60">Kode pairing</p>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <p className="font-mono text-2xl font-bold tracking-widest">
+                    {pairing.pairingCode}
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-ghost gap-1"
+                    onClick={() =>
+                      void copyText("Kode pairing", pairing.pairingCode)
+                    }
+                  >
+                    <Copy className="w-3 h-3" />
+                    Salin
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-base-content/50">
+                Kedaluwarsa:{" "}
+                {new Date(pairing.expiresAt).toLocaleString("id-ID")}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
-      <ConfirmDialog
-        open={Boolean(stopTarget)}
-        title="Hentikan rekam?"
-        message={
-          stopTarget ? (
-            <>
-              Rekam <strong>{stopTarget.invoiceNumber}</strong> akan diakhiri.
-            </>
-          ) : null
-        }
-        confirmLabel="Stop rekam"
-        danger
-        onCancel={() => setStopTarget(null)}
-        onConfirm={() => stopTarget && stopRecording.mutate(stopTarget.scanId)}
-      />
+      <div className="card bg-base-100 border border-base-300">
+        <div className="card-body gap-3">
+          <div className="flex items-center gap-2">
+            <Monitor className="w-5 h-5 text-primary" />
+            <h2 className="font-semibold">3. Status agent</h2>
+          </div>
+          {agentStatus.isLoading ? (
+            <div className="skeleton h-16 w-full" />
+          ) : status ? (
+            <dl className="grid sm:grid-cols-2 gap-3 text-sm">
+              <div>
+                <dt className="text-base-content/50">Paired</dt>
+                <dd>
+                  <span
+                    className={`badge badge-sm ${status.paired ? "badge-success" : "badge-ghost"}`}
+                  >
+                    {status.paired ? "Ya" : "Belum"}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-base-content/50">Terakhir online</dt>
+                <dd>{formatLastSeen(status.agentLastSeenAt)}</dd>
+              </div>
+              <div>
+                <dt className="text-base-content/50">Versi agent</dt>
+                <dd>{status.agentVersion ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-base-content/50">Folder klip</dt>
+                <dd className="font-mono text-xs break-all">
+                  {status.clipsDir ?? "—"}
+                </dd>
+              </div>
+            </dl>
+          ) : null}
+        </div>
+      </div>
+
+      {status?.paired && (
+        <div className="card bg-base-100 border border-primary/30">
+          <div className="card-body gap-4">
+            <div className="flex items-center gap-2">
+              <ScanLine className="w-5 h-5 text-primary" />
+              <h2 className="font-semibold">
+                4. Tes scan (di PC kasir, bukan dashboard)
+              </h2>
+            </div>
+            <p className="text-sm text-base-content/70">
+              Scan barcode <strong>tidak</strong> dilakukan di halaman web ini.
+              Agent di PC kasir yang membaca scanner USB (mode VCOM) lalu rekam
+              CCTV.
+            </p>
+            <ol className="list-decimal list-inside text-sm space-y-2 text-base-content/80">
+              <li>
+                Buka <strong>BuktiScan Agent</strong> di PC kasir → bagian{" "}
+                <strong>Preview CCTV</strong> → Refresh (tes RTSP dari LAN).
+              </li>
+              <li>
+                Di agent → <strong>Scanner USB</strong> → Pair USB (pilih port
+                COM scanner, mode VCOM).
+              </li>
+              <li>
+                Pastikan <strong>FFmpeg</strong> terpasang di Windows PC kasir.
+              </li>
+              <li>Scan invoice di scanner fisik.</li>
+              <li>
+                Cek Scan Log di web — file lokal disinkron otomatis saat agent
+                jalan.
+              </li>
+            </ol>
+            <p className="text-xs text-base-content/50">
+              Dashboard web hanya untuk admin (RTSP, workstation, log). Tidak
+              perlu setup ulang di web untuk preview atau pair USB.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

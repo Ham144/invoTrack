@@ -13,7 +13,7 @@ import { Server, Socket } from 'socket.io';
     credentials: true,
   },
 })
-export class InvoTrackGateway {
+export class BuktiScanGateway {
   @WebSocketServer()
   server: Server;
 

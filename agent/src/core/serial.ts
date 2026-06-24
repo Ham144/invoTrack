@@ -1,0 +1,158 @@
+import { SerialPort } from "serialport";
+import type { AgentScannerConfig } from "./api-client";
+import { parseScanLines, parseUsbId } from "./scan-parse";
+
+export type ScanHandler = (
+  scannerId: string,
+  invoiceNumber: string,
+) => void | Promise<void>;
+
+export interface ListedSerialPort {
+  path: string;
+  vendorId: string | null;
+  productId: string | null;
+  manufacturer: string | null;
+}
+
+export async function listSerialPorts(): Promise<ListedSerialPort[]> {
+  const ports = await SerialPort.list();
+  return ports.map((p) => ({
+    path: p.path,
+    vendorId: p.vendorId ?? null,
+    productId: p.productId ?? null,
+    manufacturer: p.manufacturer ?? null,
+  }));
+}
+
+interface SerialSession {
+  port: SerialPort;
+  scannerId: string;
+  portPath: string;
+}
+
+export class SerialManager {
+  private sessions = new Map<string, SerialSession>();
+  private usedPaths = new Set<string>();
+  private lastErrors = new Map<string, string>();
+
+  getPortPath(scannerId: string): string | null {
+    return this.sessions.get(scannerId)?.portPath ?? null;
+  }
+
+  getConnectedScannerIds(): string[] {
+    return [...this.sessions.keys()];
+  }
+
+  getScannerError(scannerId: string): string | null {
+    return this.lastErrors.get(scannerId) ?? null;
+  }
+
+  private handlePortData(scannerId: string, chunk: Buffer, onScan: ScanHandler) {
+    for (const invoice of parseScanLines(chunk.toString("utf8"))) {
+      void onScan(scannerId, invoice);
+    }
+  }
+
+  async connectScanner(
+    scanner: AgentScannerConfig,
+    onScan: ScanHandler,
+  ): Promise<void> {
+    if (this.sessions.has(scanner.id)) return;
+
+    const ports = await SerialPort.list();
+    let targetPath: string | undefined;
+
+    if (scanner.usbVendorId != null && scanner.usbProductId != null) {
+      const vid = scanner.usbVendorId
+        .toString(16)
+        .padStart(4, "0")
+        .toLowerCase();
+      const pid = scanner.usbProductId
+        .toString(16)
+        .padStart(4, "0")
+        .toLowerCase();
+      const match = ports.find((p) => {
+        const pVid = parseUsbId(p.vendorId)
+          ?.toString(16)
+          .padStart(4, "0")
+          .toLowerCase();
+        const pPid = parseUsbId(p.productId)
+          ?.toString(16)
+          .padStart(4, "0")
+          .toLowerCase();
+        return pVid === vid && pPid === pid;
+      });
+      targetPath = match?.path;
+    }
+
+    if (!targetPath && ports.length === 1 && !this.usedPaths.has(ports[0].path)) {
+      targetPath = ports[0].path;
+    }
+
+    if (!targetPath) {
+      const msg =
+        scanner.usbVendorId != null
+          ? "Port USB tidak ditemukan — colok scanner dan pair ulang"
+          : "Belum pair USB — pilih port COM di tab Scanner";
+      this.lastErrors.set(scanner.id, msg);
+      throw new Error(msg);
+    }
+
+    if (this.usedPaths.has(targetPath)) {
+      const msg = `Port ${targetPath} sudah dipakai scanner lain — satu USB hanya untuk satu scanner`;
+      this.lastErrors.set(scanner.id, msg);
+      throw new Error(msg);
+    }
+
+    const port = new SerialPort({
+      path: targetPath,
+      baudRate: scanner.baudRate || 9600,
+      autoOpen: false,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      port.open((err) => (err ? reject(err) : resolve()));
+    });
+
+    port.on("data", (chunk: Buffer) => {
+      this.handlePortData(scanner.id, chunk, onScan);
+    });
+
+    this.sessions.set(scanner.id, {
+      port,
+      scannerId: scanner.id,
+      portPath: targetPath,
+    });
+    this.usedPaths.add(targetPath);
+    this.lastErrors.delete(scanner.id);
+  }
+
+  async disconnectAll(): Promise<void> {
+    for (const session of this.sessions.values()) {
+      this.usedPaths.delete(session.portPath);
+      await new Promise<void>((resolve) => {
+        if (!session.port.isOpen) {
+          resolve();
+          return;
+        }
+        session.port.close(() => resolve());
+      });
+    }
+    this.sessions.clear();
+    this.usedPaths.clear();
+  }
+
+  async reconnectAll(
+    scanners: AgentScannerConfig[],
+    onScan: ScanHandler,
+  ): Promise<void> {
+    await this.disconnectAll();
+    for (const scanner of scanners) {
+      try {
+        await this.connectScanner(scanner, onScan);
+      } catch {
+        /* scanner optional until paired USB */
+      }
+    }
+  }
+}

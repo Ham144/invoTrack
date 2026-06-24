@@ -8,7 +8,6 @@ import LandingRoles from "./LandingRoles";
 import LandingStats from "./LandingStats";
 import LoginModal from "./LoginModal";
 import {
-  getBrandName,
   HERO_PILLS,
   LANDING_BENEFITS,
   whatsappConsultUrl,
@@ -60,7 +59,7 @@ function SectionHeader({
 
 export default function IndexPage() {
   const [loginOpen, setLoginOpen] = useState(false);
-  const brand = getBrandName();
+  const brand = "BuktiScan";
 
   return (
     <AppProviders>
@@ -106,7 +105,7 @@ export default function IndexPage() {
               </a>
             </nav>
             <div className="flex items-center gap-2 shrink-0">
-              <ConsultButton className="hidden sm:inline-flex" />
+              {/* <ConsultButton className="hidden sm:inline-flex" /> */}
               <button
                 type="button"
                 className={landingBtn.primarySm}
@@ -155,7 +154,7 @@ export default function IndexPage() {
                     <LogIn className="h-5 w-5 shrink-0" />
                     Masuk ke dashboard
                   </button>
-                  <a
+                  {/* <a
                     href={whatsappConsultUrl()}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -163,7 +162,7 @@ export default function IndexPage() {
                   >
                     <MessageCircle className="h-5 w-5 shrink-0" />
                     Konsultasi
-                  </a>
+                  </a> */}
                 </div>
               </div>
               <div className="flex-1 w-full max-w-md lg:max-w-lg">
@@ -213,7 +212,7 @@ export default function IndexPage() {
           </div>
         </section>
 
-        <section className="py-20 lg:py-24 bg-slate-50 border-y border-slate-100">
+        {/* <section className="py-20 lg:py-24 bg-slate-50 border-y border-slate-100">
           <div className="max-w-6xl mx-auto px-6 lg:px-8">
             <SectionHeader
               id="paket"
@@ -222,7 +221,7 @@ export default function IndexPage() {
             />
             <LandingPricing />
           </div>
-        </section>
+        </section> */}
 
         <section className="py-20 lg:py-24 bg-white">
           <div className="max-w-6xl mx-auto px-6 lg:px-8">
@@ -264,9 +263,9 @@ export default function IndexPage() {
               on-premise. Tim kami siap membantu.
             </p>
             <div className="mt-10 flex flex-wrap gap-4 justify-center">
-              <a
+              {/* <a
                 href={whatsappConsultUrl(
-                  "Halo, saya tertarik demo InvoTrack untuk gudang kami.",
+                  "Halo, saya tertarik demo BuktiScan untuk gudang kami.",
                 )}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -274,7 +273,7 @@ export default function IndexPage() {
               >
                 <MessageCircle className="h-5 w-5 shrink-0" />
                 Hubungi via WhatsApp
-              </a>
+              </a> */}
               <button
                 type="button"
                 className={landingBtn.onDarkSolid}

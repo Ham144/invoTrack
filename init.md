@@ -1,4 +1,4 @@
-Act as a Senior Solutions Architect. Create a clean, modular project blueprint for a Multi-Tenant IoT application named "InvoTrack CSI".
+Act as a Senior Solutions Architect. Create a clean, modular project blueprint for a Multi-Tenant IoT application named "BuktiScan CSI".
 
 The core feature is combining Invoice Scanning with CCTV Auto-Recording/Cutting in a local network environment (with a future-proof design for cloud SaaS conversion).
 
@@ -13,7 +13,7 @@ Please map out ONLY the project structures, configuration concepts, and architec
 
 ### 1. APPLICATION NAMING & IDENTITY
 
-- Name: InvoTrack
+- Name: BuktiScan
 
 ### 2. MONOREPO / MULTI-DIRECTORY STRUCTURE
 

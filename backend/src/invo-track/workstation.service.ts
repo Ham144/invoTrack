@@ -19,6 +19,14 @@ export class WorkstationService {
       where: { organizationName: userInfo.organizationName },
       include: {
         _count: { select: { scanners: true } },
+        agentDevice: {
+          select: {
+            pairedAt: true,
+            lastSeenAt: true,
+            agentVersion: true,
+            clipsDir: true,
+          },
+        },
       },
       orderBy: { label: 'asc' },
     });

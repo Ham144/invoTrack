@@ -5,6 +5,42 @@ import { ROLE } from "./types/auth";
 const DASHBOARD_PREFIX = "/dashboard";
 const ADMIN_PREFIX = "/admin";
 
+declare const __API_PROXY_TARGET__: string;
+const API_TARGET =
+  typeof __API_PROXY_TARGET__ !== "undefined"
+    ? __API_PROXY_TARGET__
+    : "http://127.0.0.1:3001";
+
+function shouldProxy(pathname: string): boolean {
+  return (
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/uploads") ||
+    pathname.startsWith("/socket.io")
+  );
+}
+
+async function proxyToBackend(
+  request: Request,
+  url: URL,
+): Promise<Response> {
+  const target = new URL(url.pathname + url.search, API_TARGET);
+  const headers = new Headers(request.headers);
+  headers.delete("host");
+
+  const init: RequestInit & { duplex?: "half" } = {
+    method: request.method,
+    headers,
+    redirect: "manual",
+  };
+
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    init.body = request.body;
+    init.duplex = "half";
+  }
+
+  return fetch(target, init);
+}
+
 function decodeToken(token: string): TokenPayload | null {
   try {
     const payload = token.split(".")[1];
@@ -20,6 +56,11 @@ function decodeToken(token: string): TokenPayload | null {
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
+
+  if (shouldProxy(pathname)) {
+    return proxyToBackend(context.request, context.url);
+  }
+
   const token = context.cookies.get("access_token")?.value;
   const refresh = context.cookies.get("refresh_token")?.value;
 
@@ -40,13 +81,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   if (!needsAuth) return next();
 
-  if (!token && refresh) return next();
-  if (!token) {
-    return context.redirect("/");
-  }
+  const decoded = token ? decodeToken(token) : null;
 
-  const decoded = decodeToken(token);
+  // access_token kedaluwarsa (10 menit) tapi refresh_token masih ada:
+  // izinkan masuk, client axios akan refresh otomatis.
   if (!decoded?.role) {
+    if (refresh) return next();
     return context.redirect("/");
   }
 

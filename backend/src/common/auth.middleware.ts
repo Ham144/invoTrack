@@ -9,7 +9,13 @@ export class AuthMiddleware implements NestMiddleware {
       '/api/user/login',
       '/api/user/refresh-token',
       '/api/organization/landing-page',
+      '/api/agent/pair',
     ];
+
+    // Agent API memakai Bearer device token (AgentAuthGuard), bukan cookie web
+    if (req.originalUrl.startsWith('/api/agent')) {
+      return next();
+    }
 
     //refresh_token tidak akan melewati middleware ini
     if (publicRoutes.some((path) => req.originalUrl.startsWith(path))) {

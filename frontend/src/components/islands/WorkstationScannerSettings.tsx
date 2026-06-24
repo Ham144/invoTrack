@@ -2,12 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AuthApi } from "@/api/auth";
-import { InvoTrackApi } from "@/api/invo-track";
+import { BuktiScanApi } from "@/api/invo-track";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { PaginatedMembers } from "@/types/auth";
 import { ROLE } from "@/types/auth";
-import { getSerialSupportStatus } from "@/lib/serial-support";
+import { AGENT_DOWNLOAD_LABEL, AGENT_DOWNLOAD_URL } from "@/lib/agent-download";
 import type {
+  AgentPairingResult,
+  AgentStatus,
   CctvConfig,
   ScannerConfig,
   ScannerQuota,
@@ -27,11 +29,14 @@ export default function WorkstationScannerSettings() {
   const [deleteScanner, setDeleteScanner] = useState<ScannerConfig | null>(
     null,
   );
+  const [pairingResult, setPairingResult] = useState<AgentPairingResult | null>(
+    null,
+  );
 
   const workstations = useQuery({
     queryKey: ["workstations"],
     queryFn: async () => {
-      const res = await InvoTrackApi.workstationList();
+      const res = await BuktiScanApi.workstationList();
       return res.data as Workstation[];
     },
   });
@@ -48,7 +53,7 @@ export default function WorkstationScannerSettings() {
   const scanners = useQuery({
     queryKey: ["scanner-config", activeWs],
     queryFn: async () => {
-      const res = await InvoTrackApi.scannerList(activeWs || undefined);
+      const res = await BuktiScanApi.scannerList(activeWs || undefined);
       return res.data as ScannerConfig[];
     },
     enabled: Boolean(activeWs),
@@ -57,7 +62,7 @@ export default function WorkstationScannerSettings() {
   const quota = useQuery({
     queryKey: ["scanner-quota"],
     queryFn: async () => {
-      const res = await InvoTrackApi.scannerQuota();
+      const res = await BuktiScanApi.scannerQuota();
       return res.data as ScannerQuota;
     },
   });
@@ -65,7 +70,7 @@ export default function WorkstationScannerSettings() {
   const cctvList = useQuery({
     queryKey: ["cctv-config"],
     queryFn: async () => {
-      const res = await InvoTrackApi.cctvList();
+      const res = await BuktiScanApi.cctvList();
       return res.data as CctvConfig[];
     },
   });
@@ -78,8 +83,32 @@ export default function WorkstationScannerSettings() {
     },
   });
 
+  const agentStatus = useQuery({
+    queryKey: ["agent-status", activeWs],
+    queryFn: async () => {
+      const res = await BuktiScanApi.agentStatus(activeWs);
+      return res.data as AgentStatus;
+    },
+    enabled: Boolean(activeWs),
+    refetchInterval: 20_000,
+  });
+
+  const generatePairing = useMutation({
+    mutationFn: async () => {
+      const res = await BuktiScanApi.agentGeneratePairingCode(activeWs);
+      return res.data as AgentPairingResult;
+    },
+    onSuccess: (data) => {
+      setPairingResult(data);
+      qc.invalidateQueries({ queryKey: ["agent-status", activeWs] });
+      qc.invalidateQueries({ queryKey: ["workstations"] });
+      toast.success("Kode pairing dibuat");
+    },
+    onError: () => toast.error("Gagal membuat kode pairing"),
+  });
+
   const createWs = useMutation({
-    mutationFn: () => InvoTrackApi.workstationCreate({ label: wsLabel }),
+    mutationFn: () => BuktiScanApi.workstationCreate({ label: wsLabel }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["workstations"] });
       setWsLabel("");
@@ -90,7 +119,7 @@ export default function WorkstationScannerSettings() {
 
   const createScanner = useMutation({
     mutationFn: () =>
-      InvoTrackApi.scannerCreate({
+      BuktiScanApi.scannerCreate({
         ...scannerForm,
         workstationId: activeWs,
         assignedUsername: scannerForm.assignedUsername || undefined,
@@ -110,13 +139,8 @@ export default function WorkstationScannerSettings() {
   });
 
   const updateScanner = useMutation({
-    mutationFn: ({
-      id,
-      body,
-    }: {
-      id: string;
-      body: Record<string, unknown>;
-    }) => InvoTrackApi.scannerUpdate(id, body),
+    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
+      BuktiScanApi.scannerUpdate(id, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scanner-config"] });
       toast.success("Scanner diperbarui");
@@ -125,7 +149,7 @@ export default function WorkstationScannerSettings() {
   });
 
   const removeScanner = useMutation({
-    mutationFn: (id: string) => InvoTrackApi.scannerDelete(id),
+    mutationFn: (id: string) => BuktiScanApi.scannerDelete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scanner-config"] });
       qc.invalidateQueries({ queryKey: ["scanner-quota"] });
@@ -134,30 +158,7 @@ export default function WorkstationScannerSettings() {
     },
   });
 
-  const pairUsb = async (scanner: ScannerConfig) => {
-    const serialStatus = getSerialSupportStatus();
-    if (!serialStatus.supported) {
-      toast.error(serialStatus.message);
-      return;
-    }
-    try {
-      const port = await navigator.serial!.requestPort();
-      const info = port.getInfo();
-      await updateScanner.mutateAsync({
-        id: scanner.id,
-        body: {
-          usbVendorId: info.usbVendorId ?? null,
-          usbProductId: info.usbProductId ?? null,
-        },
-      });
-    } catch {
-      toast.error("Pairing USB dibatalkan atau gagal");
-    }
-  };
-
-  const usedCctvIds = new Set(
-    (scanners.data ?? []).map((s) => s.cctvConfigId),
-  );
+  const usedCctvIds = new Set((scanners.data ?? []).map((s) => s.cctvConfigId));
   const availableCctv = (cctvList.data ?? []).filter(
     (c) => c.isActive && !usedCctvIds.has(c.id),
   );
@@ -174,6 +175,18 @@ export default function WorkstationScannerSettings() {
 
   return (
     <div className="space-y-8">
+      <div className="alert alert-info py-3 text-sm">
+        <div className="space-y-1">
+          <p className="font-semibold">
+            Admin atur di sini: workstation, scanner, mapping CCTV
+          </p>
+          <p>
+            Pair USB port COM dan preview CCTV dilakukan di{" "}
+            <strong>BuktiScan Agent</strong> di PC kasir — bukan di browser.
+          </p>
+        </div>
+      </div>
+
       {q && (
         <div className="flex flex-wrap gap-2">
           <span className="badge badge-outline">Plan {q.plan}</span>
@@ -196,7 +209,9 @@ export default function WorkstationScannerSettings() {
               >
                 {ws.label}
                 {ws.lastSeenAt && (
-                  <span className="badge badge-xs badge-success ml-1">online</span>
+                  <span className="badge badge-xs badge-success ml-1">
+                    online
+                  </span>
                 )}
               </button>
             ))}
@@ -219,6 +234,79 @@ export default function WorkstationScannerSettings() {
           </div>
         </div>
       </section>
+
+      {activeWs && (
+        <section className="card bg-base-100 border border-base-300">
+          <div className="card-body gap-4">
+            <h2 className="font-semibold">BuktiScan Agent (PC Kasir)</h2>
+            <p className="text-sm text-base-content/70">
+              Setiap workstation butuh agent desktop. Workstation ID wajib
+              dimasukkan di aplikasi agent bersama kode pairing.
+            </p>
+            {activeWs && (
+              <div className="bg-base-200 rounded-lg p-3 text-sm">
+                <p className="text-xs text-base-content/60">Workstation ID</p>
+                <code className="text-xs font-mono break-all">{activeWs}</code>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2 items-center">
+              <a
+                href={AGENT_DOWNLOAD_URL}
+                className="btn btn-sm btn-primary"
+                download
+              >
+                {AGENT_DOWNLOAD_LABEL}
+              </a>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                disabled={generatePairing.isPending}
+                onClick={() => generatePairing.mutate()}
+              >
+                Generate kode pairing
+              </button>
+              {agentStatus.data && (
+                <span
+                  className={`badge badge-sm ${agentStatus.data.paired ? "badge-success" : "badge-ghost"}`}
+                >
+                  {agentStatus.data.paired ? "Agent paired" : "Belum paired"}
+                </span>
+              )}
+            </div>
+            {pairingResult && pairingResult.workstationId === activeWs && (
+              <div className="bg-base-200 rounded-lg p-4 space-y-2">
+                <div>
+                  <p className="text-xs text-base-content/60">Workstation ID</p>
+                  <code className="text-xs font-mono break-all">
+                    {pairingResult.workstationId}
+                  </code>
+                </div>
+                <div>
+                  <p className="text-xs text-base-content/60">Kode pairing</p>
+                  <p className="font-mono text-xl font-bold tracking-widest">
+                    {pairingResult.pairingCode}
+                  </p>
+                </div>
+                <p className="text-xs text-base-content/50">
+                  Kedaluwarsa:{" "}
+                  {new Date(pairingResult.expiresAt).toLocaleString("id-ID")}
+                </p>
+              </div>
+            )}
+            {agentStatus.data?.agentLastSeenAt && (
+              <p className="text-xs text-base-content/50">
+                Agent terakhir online:{" "}
+                {new Date(agentStatus.data.agentLastSeenAt).toLocaleString(
+                  "id-ID",
+                )}
+                {agentStatus.data.agentVersion
+                  ? ` · v${agentStatus.data.agentVersion}`
+                  : ""}
+              </p>
+            )}
+          </div>
+        </section>
+      )}
 
       {activeWs && (
         <section className="card bg-base-100 border border-base-300">
@@ -306,7 +394,10 @@ export default function WorkstationScannerSettings() {
         ) : (
           <ul className="space-y-3">
             {(scanners.data ?? []).map((s) => (
-              <li key={s.id} className="card bg-base-200 border border-base-300">
+              <li
+                key={s.id}
+                className="card bg-base-200 border border-base-300"
+              >
                 <div className="card-body gap-2 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
@@ -324,14 +415,16 @@ export default function WorkstationScannerSettings() {
                         {s.baudRate} baud
                       </p>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        className="btn btn-xs btn-outline"
-                        onClick={() => pairUsb(s)}
-                      >
-                        Pair USB
-                      </button>
+                    <div className="flex gap-2 items-center">
+                      {s.usbVendorId != null ? (
+                        <span className="badge badge-sm badge-success badge-outline">
+                          USB paired
+                        </span>
+                      ) : (
+                        <span className="badge badge-sm badge-ghost">
+                          Pair USB di agent
+                        </span>
+                      )}
                       <button
                         type="button"
                         className="btn btn-xs btn-error btn-outline"

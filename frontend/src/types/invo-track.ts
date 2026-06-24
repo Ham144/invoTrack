@@ -5,13 +5,19 @@ export interface InvoiceScan {
   scannedAt: string;
   completedAt?: string | null;
   videoPath?: string | null;
+  localClipPath?: string | null;
+  recordingSource?: 'EDGE' | 'SERVER' | string;
   status: 'RECORDING' | 'COMPLETED' | 'FAILED';
+  stopRequestedAt?: string | null;
   previousInvoice?: string | null;
+  workstationId?: string | null;
+  workstation?: { id: string; label: string } | null;
   scannerConfigId?: string | null;
   scannerConfig?: {
     id: string;
     label: string;
     assignedUsername?: string | null;
+    workstationId?: string;
   } | null;
   cctvConfigId?: string | null;
   cctvConfig?: { id: string; label: string } | null;
@@ -42,6 +48,31 @@ export interface Workstation {
   isActive: boolean;
   lastSeenAt?: string | null;
   _count?: { scanners: number };
+  agentDevice?: {
+    pairedAt?: string | null;
+    lastSeenAt?: string | null;
+    agentVersion?: string | null;
+    clipsDir?: string | null;
+  } | null;
+}
+
+export interface AgentPairingResult {
+  workstationId: string;
+  pairingCode: string;
+  expiresAt: string;
+  paired: boolean;
+  agentLastSeenAt?: string | null;
+  agentVersion?: string | null;
+}
+
+export interface AgentStatus {
+  workstationId: string;
+  label: string;
+  paired: boolean;
+  agentLastSeenAt?: string | null;
+  agentVersion?: string | null;
+  clipsDir?: string | null;
+  pairingExpiresAt?: string | null;
 }
 
 export interface ScannerConfig {
@@ -100,4 +131,6 @@ export interface ActiveRecording {
   scannerLabel: string | null;
   cctvConfigId: string | null;
   cctvLabel: string | null;
+  recordingSource?: string;
+  stopRequested?: boolean;
 }

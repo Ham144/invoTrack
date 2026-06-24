@@ -1,6 +1,17 @@
 import { BASE_URL } from "@/lib/constants";
 import type { InvoiceScan } from "@/types/invo-track";
 
+export const AGENT_CLIP_PORT = 19500;
+export const AGENT_CLIP_BASE = `http://127.0.0.1:${AGENT_CLIP_PORT}`;
+
+export function safeInvoiceFileName(invoiceNumber: string): string {
+  return invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+export function agentClipUrl(invoiceNumber: string): string {
+  return `${AGENT_CLIP_BASE}/clips/${encodeURIComponent(safeInvoiceFileName(invoiceNumber))}.mp4`;
+}
+
 export function formatDurationMs(ms: number): string {
   if (ms < 0 || !Number.isFinite(ms)) return "—";
   const totalSec = Math.floor(ms / 1000);
@@ -49,12 +60,20 @@ function encodeMediaPath(videoPath: string): string {
 }
 
 export function scanVideoSrc(scan: InvoiceScan): string | null {
-  if (
-    !scan.videoPath ||
-    scan.status === "FAILED" ||
-    scan.status === "RECORDING"
-  ) {
+  if (scan.status === "FAILED" || scan.status === "RECORDING") {
+    return null;
+  }
+
+  if (scan.recordingSource === "EDGE" || scan.localClipPath) {
+    return agentClipUrl(scan.invoiceNumber);
+  }
+
+  if (!scan.videoPath) {
     return null;
   }
   return encodeMediaPath(scan.videoPath);
+}
+
+export function scanVideoLocalOnly(scan: InvoiceScan): boolean {
+  return scan.recordingSource === "EDGE" || Boolean(scan.localClipPath);
 }

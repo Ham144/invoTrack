@@ -7,7 +7,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import * as path from 'path';
 import { MyOrganizationModule } from './my-organization/my-organization.module';
 import { RedisIoAdapterModule } from './RedisIoAdapter/redis-io-adapter.module';
-import { InvoTrackModule } from './invo-track/invo-track.module';
+import { BuktiScanModule } from './invo-track/invo-track.module';
 
 @Module({
   imports: [
@@ -23,7 +23,7 @@ import { InvoTrackModule } from './invo-track/invo-track.module';
     }),
     MyOrganizationModule,
     RedisIoAdapterModule,
-    InvoTrackModule,
+    BuktiScanModule,
   ],
   controllers: [],
   providers: [HttpExceptionFilter],

@@ -1,16 +1,13 @@
 import {
-  Body,
   Controller,
   Get,
   Param,
-  Post,
   Query,
 } from '@nestjs/common';
 import { InvoiceScanService } from './invoice-scan.service';
 import { Auth } from 'src/common/auth.decorator';
 import { TokenPayload } from 'src/user/dto/token-payload.dto';
 import { Authorization } from 'src/common/authorization.decorator';
-import { IngestScannerDto } from './dto/scanner-config.dto';
 
 @Controller('invoice-scan')
 export class InvoiceScanController {
@@ -40,18 +37,5 @@ export class InvoiceScanController {
     @Param('invoiceNumber') invoiceNumber: string,
   ) {
     return this.service.findByInvoice(userInfo, invoiceNumber);
-  }
-
-  @Authorization('ADMIN_ORGANIZATION', 'ADMIN_GUDANG', 'OPERATOR')
-  @Post('ingest/scanner')
-  ingestScanner(
-    @Auth() userInfo: TokenPayload,
-    @Body() dto: IngestScannerDto,
-  ) {
-    return this.service.ingestFromScanner(
-      userInfo,
-      dto.scannerConfigId,
-      dto.invoiceNumber,
-    );
   }
 }

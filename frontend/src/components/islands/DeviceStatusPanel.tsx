@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { InvoTrackApi } from "@/api/invo-track";
+import { BuktiScanApi } from "@/api/invo-track";
 import type { DeviceStatus } from "@/types/invo-track";
 
 function StatusDot({ online }: { online: boolean }) {
@@ -19,7 +19,7 @@ export default function DeviceStatusPanel() {
   const { data, isLoading } = useQuery({
     queryKey: ["device-status"],
     queryFn: async () => {
-      const res = await InvoTrackApi.deviceStatus();
+      const res = await BuktiScanApi.deviceStatus();
       return res.data as DeviceStatus;
     },
   });

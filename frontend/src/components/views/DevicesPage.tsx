@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   Camera,
-  Circle,
   Clapperboard,
   Gauge,
   ScanLine,
@@ -9,14 +8,12 @@ import {
   Video,
 } from "lucide-react";
 import DashboardFrame from "@/components/islands/DashboardFrame";
-import TenantIoTSettings, {
-  CctvLivePreview,
-} from "@/components/islands/TenantIoTSettings";
+import TenantIoTSettings from "@/components/islands/TenantIoTSettings";
 import WorkstationScannerSettings from "@/components/islands/WorkstationScannerSettings";
 import RecordingSettingsPanel from "@/components/islands/RecordingSettingsPanel";
 import StatCard from "@/components/ui/StatCard";
 import { useQuery } from "@tanstack/react-query";
-import { InvoTrackApi } from "@/api/invo-track";
+import { BuktiScanApi } from "@/api/invo-track";
 import type { DeviceStatus, SubscriptionQuota } from "@/types/invo-track";
 
 type Tab = "config" | "scanners" | "recording";
@@ -35,7 +32,7 @@ function DevicesPageContent() {
   const { data: devices, isLoading: devicesLoading } = useQuery({
     queryKey: ["device-status"],
     queryFn: async () => {
-      const res = await InvoTrackApi.deviceStatus();
+      const res = await BuktiScanApi.deviceStatus();
       return res.data as DeviceStatus;
     },
     refetchInterval: 15000,
@@ -44,14 +41,12 @@ function DevicesPageContent() {
   const { data: quota, isLoading: quotaLoading } = useQuery({
     queryKey: ["cctv-quota"],
     queryFn: async () => {
-      const res = await InvoTrackApi.cctvQuota();
+      const res = await BuktiScanApi.cctvQuota();
       return res.data as SubscriptionQuota;
     },
   });
 
   const cctvTotal = devices?.cctv.length ?? 0;
-  const cctvOnline = devices?.cctv.filter((c) => c.isOnline).length ?? 0;
-  const allOnline = cctvTotal > 0 && cctvOnline === cctvTotal;
   const quotaFull = quota ? quota.currentCctv >= quota.maxCctv : false;
 
   const tabs: {
@@ -63,13 +58,13 @@ function DevicesPageContent() {
     {
       key: "config",
       label: "Konfigurasi CCTV",
-      description: "RTSP, label, dan status kamera",
+      description: "URL RTSP — preview di agent PC kasir",
       icon: Camera,
     },
     {
       key: "scanners",
       label: "Workstation & Scanner",
-      description: "PC kasir, operator, pairing USB",
+      description: "Mapping scanner–CCTV, pairing agent",
       icon: ScanLine,
     },
     {
@@ -102,8 +97,12 @@ function DevicesPageContent() {
                 Perangkat & CCTV
               </h1>
               <p className="text-primary-content/80 text-sm md:text-base leading-relaxed">
-                Pantau kamera gudang secara langsung, kelola stream RTSP, dan
-                atur kebijakan rekam organisasi dari satu tempat.
+                Admin: atur RTSP, workstation, dan scanner di sini. Operasional
+                (preview CCTV, pair USB, scan) di{" "}
+                <strong className="text-primary-content">
+                  BuktiScan Agent
+                </strong>{" "}
+                PC kasir.
               </p>
             </div>
 
@@ -113,7 +112,7 @@ function DevicesPageContent() {
                 className="btn btn-sm md:btn-md bg-base-100 text-primary border-0 shadow-md hover:shadow-lg"
               >
                 <Video className="w-4 h-4" />
-                Halaman Scan
+                Halaman Scan / Agent
               </a>
             </div>
           </div>
@@ -122,22 +121,22 @@ function DevicesPageContent() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5">
         <StatCard
-          label="CCTV online"
-          value={devicesLoading ? "…" : `${cctvOnline}/${cctvTotal}`}
-          hint={
-            cctvTotal === 0
-              ? "Belum ada kamera terdaftar"
-              : allOnline
-                ? "Semua kamera terhubung"
-                : `${cctvTotal - cctvOnline} kamera offline`
-          }
+          label="CCTV terdaftar"
+          value={devicesLoading ? "…" : String(cctvTotal)}
+          hint="Preview & rekam lewat agent di PC kasir"
           icon={Camera}
-          tone={allOnline && cctvTotal > 0 ? "success" : cctvOnline > 0 ? "warning" : "default"}
+          tone={cctvTotal > 0 ? "primary" : "default"}
         />
         <StatCard
           label="Kuota CCTV"
-          value={quotaLoading ? "…" : `${quota?.currentCctv ?? 0}/${quota?.maxCctv ?? "—"}`}
-          hint={quotaFull ? "Kuota penuh — upgrade plan" : "Slot kamera tersedia"}
+          value={
+            quotaLoading
+              ? "…"
+              : `${quota?.currentCctv ?? 0}/${quota?.maxCctv ?? "—"}`
+          }
+          hint={
+            quotaFull ? "Kuota penuh — upgrade plan" : "Slot kamera tersedia"
+          }
           icon={Gauge}
           tone={quotaFull ? "warning" : "primary"}
         />
@@ -151,56 +150,8 @@ function DevicesPageContent() {
       </div>
 
       <section className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden">
-        <div className="flex flex-col gap-4 border-b border-base-300 px-5 py-4 md:px-6 md:flex-row md:items-center md:justify-between bg-base-200/40">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Video className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="font-bold text-base md:text-lg">Live Preview</h2>
-              <p className="text-xs md:text-sm text-base-content/60">
-                Snapshot RTSP diperbarui otomatis setiap 8 detik
-              </p>
-            </div>
-          </div>
-          <span className="badge badge-outline gap-2 w-fit">
-            <Circle
-              className={`w-2 h-2 fill-current ${cctvOnline > 0 ? "text-success" : "text-base-content/30"}`}
-            />
-            {cctvOnline} stream aktif
-          </span>
-        </div>
-
-        <div className="p-5 md:p-6">
-          {!devicesLoading && devices && devices.cctv.length > 0 && (
-            <div className="mb-5 flex flex-wrap gap-2">
-              {devices.cctv.map((c) => (
-                <span
-                  key={c.id}
-                  className={`badge badge-lg gap-2 font-normal ${
-                    c.isOnline
-                      ? "badge-success badge-outline"
-                      : "badge-ghost border border-base-300"
-                  }`}
-                >
-                  <Circle
-                    className={`w-2 h-2 fill-current shrink-0 ${c.isOnline ? "text-success" : "text-error"}`}
-                  />
-                  {c.label}
-                </span>
-              ))}
-            </div>
-          )}
-          <CctvLivePreview />
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden">
         <div className="border-b border-base-300 bg-base-200/30 p-2 md:p-3">
-          <div
-            role="tablist"
-            className="grid grid-cols-1 sm:grid-cols-3 gap-2"
-          >
+          <div role="tablist" className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {tabs.map((t) => {
               const active = tab === t.key;
               return (
@@ -242,9 +193,9 @@ function DevicesPageContent() {
         </div>
 
         <div className="p-5 md:p-6">
-      {tab === "config" && <TenantIoTSettings />}
-      {tab === "scanners" && <WorkstationScannerSettings />}
-      {tab === "recording" && <RecordingSettingsPanel />}
+          {tab === "config" && <TenantIoTSettings />}
+          {tab === "scanners" && <WorkstationScannerSettings />}
+          {tab === "recording" && <RecordingSettingsPanel />}
         </div>
       </section>
     </div>

@@ -8,9 +8,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/common/prisma.service';
 import { TokenPayload } from 'src/user/dto/token-payload.dto';
-import { InvoiceScanStatus } from 'src/common/shared-enum';
+import { InvoiceScanStatus, RecordingSource } from 'src/common/shared-enum';
 import { FfmpegService } from './ffmpeg.service';
-import { InvoTrackGateway } from './invo-track.gateway';
+import { BuktiScanGateway } from './invo-track.gateway';
 import { RecordingTimerService } from './recording-timer.service';
 import { Prisma } from '@prisma/client';
 
@@ -21,8 +21,10 @@ const scanInclude = {
       id: true,
       label: true,
       assignedUsername: true,
+      workstationId: true,
     },
   },
+  workstation: { select: { id: true, label: true } },
 } as const;
 
 export type CompleteRecordingReason = 'NEXT_SCAN' | 'TIME_LIMIT' | 'MANUAL';
@@ -44,6 +46,22 @@ export interface ActiveRecordingRow {
   scannerLabel: string | null;
   cctvConfigId: string | null;
   cctvLabel: string | null;
+  recordingSource: string;
+  stopRequested: boolean;
+}
+
+export interface AgentActiveRecordingRow {
+  scanId: string;
+  invoiceNumber: string;
+  scannedAt: Date;
+  maxDurationSec: number;
+  remainingSec: number;
+  stopRequested: boolean;
+  scannerConfigId: string | null;
+  cctvConfigId: string | null;
+  rtspUrl: string | null;
+  cctvUsername: string | null;
+  cctvPassword: string | null;
 }
 
 @Injectable()
@@ -53,7 +71,7 @@ export class InvoiceScanService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ffmpeg: FfmpegService,
-    private readonly gateway: InvoTrackGateway,
+    private readonly gateway: BuktiScanGateway,
     @Inject(forwardRef(() => RecordingTimerService))
     private readonly recordingTimer: RecordingTimerService,
   ) {}
@@ -132,9 +150,7 @@ export class InvoiceScanService {
     return rows.map((row) => {
       const elapsedSec = Math.floor((now - row.scannedAt.getTime()) / 1000);
       const remainingSec =
-        maxDurationSec > 0
-          ? Math.max(0, maxDurationSec - elapsedSec)
-          : 0;
+        maxDurationSec > 0 ? Math.max(0, maxDurationSec - elapsedSec) : 0;
       return {
         scanId: row.id,
         invoiceNumber: row.invoiceNumber,
@@ -145,6 +161,59 @@ export class InvoiceScanService {
         scannerLabel: row.scannerConfig?.label ?? null,
         cctvConfigId: row.cctvConfigId,
         cctvLabel: row.cctvConfig?.label ?? null,
+        recordingSource: row.recordingSource,
+        stopRequested: Boolean(row.stopRequestedAt),
+      };
+    });
+  }
+
+  async listAgentActiveRecordings(
+    organizationName: string,
+    workstationId: string,
+  ): Promise<AgentActiveRecordingRow[]> {
+    const org = await this.prisma.organization.findUnique({
+      where: { name: organizationName },
+      select: { recordingMaxDurationSec: true },
+    });
+    const maxDurationSec = org?.recordingMaxDurationSec ?? 300;
+
+    const rows = await this.prisma.invoiceScan.findMany({
+      where: {
+        organizationName,
+        workstationId,
+        status: InvoiceScanStatus.RECORDING,
+        recordingSource: RecordingSource.EDGE,
+      },
+      orderBy: { scannedAt: 'desc' },
+      include: {
+        cctvConfig: {
+          select: {
+            id: true,
+            rtspUrl: true,
+            username: true,
+            password: true,
+          },
+        },
+      },
+    });
+
+    const now = Date.now();
+    return rows.map((row) => {
+      const elapsedSec = Math.floor((now - row.scannedAt.getTime()) / 1000);
+      const remainingSec =
+        maxDurationSec > 0 ? Math.max(0, maxDurationSec - elapsedSec) : 0;
+      return {
+        scanId: row.id,
+        invoiceNumber: row.invoiceNumber,
+        scannedAt: row.scannedAt,
+        maxDurationSec,
+        remainingSec,
+        stopRequested: Boolean(row.stopRequestedAt) || remainingSec <= 0,
+        scannerConfigId: row.scannerConfigId,
+        cctvConfigId: row.cctvConfigId,
+        rtspUrl: row.cctvConfig?.rtspUrl ?? null,
+        cctvUsername: row.cctvConfig?.username ?? null,
+        cctvPassword: row.cctvConfig?.password ?? null,
       };
     });
   }
@@ -205,6 +274,16 @@ export class InvoiceScanService {
 
       this.recordingTimer.cancel(scanId);
 
+      if (scan.recordingSource === RecordingSource.EDGE) {
+        await this.prisma.invoiceScan.update({
+          where: { id: scanId },
+          data: { stopRequestedAt: new Date() },
+        });
+        this.gateway.emitScanLogUpdate(scan.organizationName);
+        this.gateway.emitDeviceStatusUpdate(scan.organizationName);
+        return;
+      }
+
       if (scan.cctvConfigId) {
         await this.ffmpeg.stopRecording(
           scan.organizationName,
@@ -234,10 +313,7 @@ export class InvoiceScanService {
     }
   }
 
-  async stopRecordingManually(
-    userInfo: TokenPayload,
-    scanId: string,
-  ) {
+  async stopRecordingManually(userInfo: TokenPayload, scanId: string) {
     const scan = await this.prisma.invoiceScan.findFirst({
       where: {
         id: scanId,
@@ -273,6 +349,260 @@ export class InvoiceScanService {
     });
   }
 
+  async completeFromAgent(
+    scanId: string,
+    workstationId: string,
+    localClipPath: string,
+  ) {
+    const scan = await this.prisma.invoiceScan.findFirst({
+      where: {
+        id: scanId,
+        workstationId,
+        recordingSource: RecordingSource.EDGE,
+        status: InvoiceScanStatus.RECORDING,
+      },
+    });
+    if (!scan) {
+      throw new NotFoundException(
+        'Rekam aktif tidak ditemukan untuk agent ini',
+      );
+    }
+
+    this.recordingTimer.cancel(scanId);
+
+    const safeName = scan.invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const agentClipUrl = `http://127.0.0.1:19500/clips/${safeName}.mp4`;
+
+    const updated = await this.prisma.invoiceScan.update({
+      where: { id: scanId },
+      data: {
+        status: InvoiceScanStatus.COMPLETED,
+        completedAt: new Date(),
+        localClipPath,
+        videoPath: agentClipUrl,
+        stopRequestedAt: null,
+      },
+      include: scanInclude,
+    });
+
+    this.gateway.emitScanLogUpdate(scan.organizationName);
+    this.gateway.emitDeviceStatusUpdate(scan.organizationName);
+    return updated;
+  }
+
+  async failFromAgent(scanId: string, workstationId: string) {
+    const scan = await this.prisma.invoiceScan.findFirst({
+      where: {
+        id: scanId,
+        workstationId,
+        recordingSource: RecordingSource.EDGE,
+        status: InvoiceScanStatus.RECORDING,
+      },
+    });
+    if (!scan) {
+      throw new NotFoundException(
+        'Rekam aktif tidak ditemukan untuk agent ini',
+      );
+    }
+
+    this.recordingTimer.cancel(scanId);
+
+    const updated = await this.prisma.invoiceScan.update({
+      where: { id: scanId },
+      data: {
+        status: InvoiceScanStatus.FAILED,
+        completedAt: new Date(),
+        stopRequestedAt: null,
+      },
+      include: scanInclude,
+    });
+
+    this.gateway.emitScanLogUpdate(scan.organizationName);
+    this.gateway.emitDeviceStatusUpdate(scan.organizationName);
+    return updated;
+  }
+
+  async reconcileClipsFromAgent(
+    organizationName: string,
+    workstationId: string,
+    clips: {
+      invoiceNumber: string;
+      localClipPath: string;
+      sizeBytes: number;
+    }[],
+  ) {
+    const MIN_BYTES = 65536;
+    let completed = 0;
+    let imported = 0;
+    let skipped = 0;
+
+    const defaultScanner = await this.prisma.scannerConfig.findFirst({
+      where: {
+        organizationName,
+        workstationId,
+        isActive: true,
+      },
+      orderBy: { label: 'asc' },
+    });
+
+    for (const clip of clips) {
+      if (clip.sizeBytes < MIN_BYTES) {
+        skipped++;
+        continue;
+      }
+
+      const normalized = clip.invoiceNumber.trim().toUpperCase();
+      if (!normalized) {
+        skipped++;
+        continue;
+      }
+
+      const existing = await this.prisma.invoiceScan.findUnique({
+        where: {
+          organizationName_invoiceNumber: {
+            organizationName,
+            invoiceNumber: normalized,
+          },
+        },
+      });
+
+      if (existing?.status === InvoiceScanStatus.COMPLETED) {
+        skipped++;
+        continue;
+      }
+
+      if (existing?.status === InvoiceScanStatus.RECORDING) {
+        await this.completeFromAgent(
+          existing.id,
+          workstationId,
+          clip.localClipPath,
+        );
+        completed++;
+        continue;
+      }
+
+      if (!defaultScanner) {
+        skipped++;
+        continue;
+      }
+
+      const safeName = normalized.replace(/[^a-zA-Z0-9_-]/g, '_');
+      await this.prisma.invoiceScan.create({
+        data: {
+          organizationName,
+          invoiceNumber: normalized,
+          status: InvoiceScanStatus.COMPLETED,
+          recordingSource: RecordingSource.EDGE,
+          workstationId,
+          cctvConfigId: defaultScanner.cctvConfigId,
+          scannerConfigId: defaultScanner.id,
+          scannedByUsername: defaultScanner.assignedUsername,
+          localClipPath: clip.localClipPath,
+          videoPath: `http://127.0.0.1:19500/clips/${safeName}.mp4`,
+          scannedAt: new Date(),
+          completedAt: new Date(),
+        },
+      });
+      imported++;
+    }
+
+    if (completed > 0 || imported > 0) {
+      this.gateway.emitScanLogUpdate(organizationName);
+      this.gateway.emitDeviceStatusUpdate(organizationName);
+    }
+
+    return { completed, imported, skipped };
+  }
+
+  async ingestEdge(
+    organizationName: string,
+    invoiceNumber: string,
+    cctvConfigId: string,
+    workstationId: string,
+    scannedByUsername?: string,
+    scannerConfigId?: string,
+  ) {
+    const normalized = invoiceNumber.trim().toUpperCase();
+    if (!normalized) {
+      throw new BadRequestException('Nomor invoice wajib diisi');
+    }
+
+    const cctv = await this.prisma.cctvConfig.findFirst({
+      where: { id: cctvConfigId, organizationName },
+      include: {
+        organization: { select: { recordingMaxDurationSec: true } },
+      },
+    });
+    if (!cctv) {
+      throw new BadRequestException('CCTV tidak ditemukan');
+    }
+    if (!cctv.isActive) {
+      throw new BadRequestException('CCTV tidak aktif');
+    }
+
+    const previous = await this.prisma.invoiceScan.findFirst({
+      where: {
+        organizationName,
+        cctvConfigId,
+        status: InvoiceScanStatus.RECORDING,
+      },
+      orderBy: { scannedAt: 'desc' },
+    });
+
+    let closedInvoice: string | null = null;
+    if (previous) {
+      closedInvoice = previous.invoiceNumber;
+      await this.completeRecording(previous.id, 'NEXT_SCAN');
+    }
+
+    const scan = await this.prisma.invoiceScan.upsert({
+      where: {
+        organizationName_invoiceNumber: {
+          organizationName,
+          invoiceNumber: normalized,
+        },
+      },
+      create: {
+        organizationName,
+        invoiceNumber: normalized,
+        status: InvoiceScanStatus.RECORDING,
+        recordingSource: RecordingSource.EDGE,
+        workstationId,
+        cctvConfigId,
+        scannerConfigId: scannerConfigId ?? null,
+        scannedByUsername: scannedByUsername ?? null,
+        previousInvoice: closedInvoice,
+        completedAt: null,
+        videoPath: null,
+        localClipPath: null,
+        stopRequestedAt: null,
+      },
+      update: {
+        scannedAt: new Date(),
+        status: InvoiceScanStatus.RECORDING,
+        recordingSource: RecordingSource.EDGE,
+        workstationId,
+        cctvConfigId,
+        scannerConfigId: scannerConfigId ?? null,
+        scannedByUsername: scannedByUsername ?? null,
+        previousInvoice: closedInvoice,
+        completedAt: null,
+        videoPath: null,
+        localClipPath: null,
+        stopRequestedAt: null,
+      },
+      include: scanInclude,
+    });
+
+    const maxDuration = cctv.organization?.recordingMaxDurationSec ?? 300;
+    this.recordingTimer.schedule(scan.id, maxDuration);
+
+    this.gateway.emitScanLogUpdate(organizationName);
+    this.gateway.emitDeviceStatusUpdate(organizationName);
+
+    return scan;
+  }
+
   async ingest(
     organizationName: string,
     invoiceNumber: string,
@@ -301,8 +631,7 @@ export class InvoiceScanService {
       throw new BadRequestException('CCTV tidak aktif');
     }
 
-    const rtspUrl =
-      cctv.rtspUrl?.trim() || process.env.CCTV_RTSP_URL || '';
+    const rtspUrl = cctv.rtspUrl?.trim() || process.env.CCTV_RTSP_URL || '';
 
     if (!rtspUrl) {
       throw new BadRequestException('URL RTSP CCTV kosong');
@@ -406,12 +735,8 @@ export class InvoiceScanService {
       throw new BadRequestException('CCTV scanner tidak aktif');
     }
 
-    return this.ingest(
-      userInfo.organizationName,
-      invoiceNumber,
-      scanner.cctvConfigId,
-      scanner.assignedUsername ?? undefined,
-      scanner.id,
+    throw new BadRequestException(
+      'Scan dari browser tidak didukung. Gunakan BuktiScan Agent di PC kasir.',
     );
   }
 }

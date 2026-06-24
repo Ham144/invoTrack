@@ -28,6 +28,7 @@ model Organization {
   workstations            Workstation[]
   scannerConfigs          ScannerConfig[]
   invoiceScans            InvoiceScan[]
+  agentDevices            AgentDevice[]
   recordingMaxDurationSec Int             @default(300)
 }
 
@@ -62,8 +63,27 @@ model Workstation {
   isActive         Boolean         @default(true)
   lastSeenAt       DateTime?
   scanners         ScannerConfig[]
+  agentDevice      AgentDevice?
+  invoiceScans     InvoiceScan[]
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
+}
+
+model AgentDevice {
+  id               String       @id @default(uuid())
+  workstationId    String       @unique
+  workstation      Workstation  @relation(fields: [workstationId], references: [id], onDelete: Cascade)
+  organizationName String
+  organization     Organization @relation(fields: [organizationName], references: [name], onDelete: Cascade)
+  deviceTokenHash  String
+  pairingCode      String?
+  pairingExpiresAt DateTime?
+  pairedAt         DateTime?
+  agentVersion     String?
+  lastSeenAt       DateTime?
+  clipsDir         String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 }
 
 model ScannerConfig {
@@ -111,8 +131,13 @@ model InvoiceScan {
   scannedAt         DateTime       @default(now())
   completedAt       DateTime?
   videoPath         String?
+  localClipPath     String?
+  recordingSource   String         @default("EDGE")
   status            String         @default("RECORDING")
+  stopRequestedAt   DateTime?
   previousInvoice   String?
+  workstationId     String?
+  workstation       Workstation?   @relation(fields: [workstationId], references: [id], onDelete: SetNull)
   scannerConfigId   String?
   scannerConfig     ScannerConfig? @relation(fields: [scannerConfigId], references: [id], onDelete: SetNull)
   cctvConfigId      String?

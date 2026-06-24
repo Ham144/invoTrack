@@ -111,8 +111,8 @@ export class UserController {
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const access_token = req?.cookies['access_token'];
     await this.authService.logout(access_token);
-    res.clearCookie('access_token', { path: '/' });
-    res.clearCookie('refresh_token', { path: '/' });
+    res.clearCookie('access_token', accessTokenOption);
+    res.clearCookie('refresh_token', refreshTokenOption);
     return { message: 'Logout success' };
   }
 

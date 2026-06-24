@@ -16,6 +16,14 @@ export enum InvoiceScanStatus {
   FAILED = 'FAILED',
 }
 
+export const RecordingSource = {
+  EDGE: 'EDGE',
+  SERVER: 'SERVER',
+} as const;
+
+export type RecordingSourceKey =
+  (typeof RecordingSource)[keyof typeof RecordingSource];
+
 export interface GetLandingPageStats {
   totalOrganizations: number;
   totalScansToday: number;
