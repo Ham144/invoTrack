@@ -6,13 +6,23 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import DataTable from "@/components/ui/DataTable";
 import type { UserInfo, PaginatedMembers } from "@/types/auth";
 import { ROLE } from "@/types/auth";
+import { ROLE_LABELS, canManageMembers } from "@/lib/permissions";
+import { useSessionStore } from "@/stores/sessionStore";
 
 export default function MembersPanel() {
   const qc = useQueryClient();
+  const user = useSessionStore((s) => s.user);
+  const canEdit = canManageMembers(user?.role);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<UserInfo | null>(null);
+  const [editForm, setEditForm] = useState({
+    displayName: "",
+    role: ROLE.OPERATOR as ROLE,
+    password: "",
+  });
   const [form, setForm] = useState({
     username: "",
     password: "",
@@ -62,12 +72,45 @@ export default function MembersPanel() {
     },
   });
 
+  const updateUser = useMutation({
+    mutationFn: () =>
+      AuthApi.updateUser({
+        username: editTarget!.username,
+        displayName: editForm.displayName || undefined,
+        role: editForm.role,
+        password: editForm.password || undefined,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["members"] });
+      setEditTarget(null);
+      setEditForm({ displayName: "", role: ROLE.OPERATOR, password: "" });
+      toast.success("Anggota diperbarui");
+    },
+    onError: () => toast.error("Gagal memperbarui anggota"),
+  });
+
+  const openEdit = (u: UserInfo) => {
+    setEditTarget(u);
+    setEditForm({
+      displayName: u.displayName ?? "",
+      role: u.role,
+      password: "",
+    });
+  };
+
   const items = members.data?.items ?? [];
   const total = members.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / 50));
 
   return (
     <div className="space-y-8">
+      {!canEdit && (
+        <div className="alert alert-warning text-sm py-3">
+          Mode baca saja — hanya Admin Organisasi yang dapat mengelola anggota.
+        </div>
+      )}
+
+      {canEdit && (
       <section className="card bg-base-100 border border-base-300">
         <div className="card-body gap-4">
           <h2 className="font-semibold">Tambah anggota</h2>
@@ -100,7 +143,7 @@ export default function MembersPanel() {
             >
               {Object.values(ROLE).map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {ROLE_LABELS[r] ?? r}
                 </option>
               ))}
             </select>
@@ -119,6 +162,7 @@ export default function MembersPanel() {
           </div>
         </div>
       </section>
+      )}
 
       <section className="space-y-3">
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
@@ -148,7 +192,9 @@ export default function MembersPanel() {
                   <td className="font-mono">{u.username}</td>
                   <td>{u.displayName}</td>
                   <td>
-                    <span className="badge badge-outline badge-sm">{u.role}</span>
+                    <span className="badge badge-outline badge-sm">
+                      {ROLE_LABELS[u.role] ?? u.role}
+                    </span>
                   </td>
                   <td className="text-sm">
                     {u.assignedScanner?.label ?? (
@@ -164,13 +210,26 @@ export default function MembersPanel() {
                     )}
                   </td>
                   <td>
-                    <button
-                      type="button"
-                      className="btn btn-xs btn-error btn-outline"
-                      onClick={() => setDeleteTarget(u.username)}
-                    >
-                      Hapus
-                    </button>
+                    {canEdit ? (
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-outline"
+                        onClick={() => openEdit(u)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-error btn-outline"
+                        onClick={() => setDeleteTarget(u.username)}
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                    ) : (
+                      <span className="text-base-content/50">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -202,6 +261,61 @@ export default function MembersPanel() {
           </div>
         </div>
       </section>
+
+      <dialog className={`modal ${editTarget ? "modal-open" : ""}`}>
+        <div className="modal-box">
+          <h3 className="font-bold">Edit {editTarget?.username}</h3>
+          <div className="py-4 grid gap-3">
+            <input
+              className="input input-bordered input-sm"
+              placeholder="Nama tampilan"
+              value={editForm.displayName}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, displayName: e.target.value }))
+              }
+            />
+            <select
+              className="select select-bordered select-sm"
+              value={editForm.role}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, role: e.target.value as ROLE }))
+              }
+            >
+              {Object.values(ROLE).map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_LABELS[r] ?? r}
+                </option>
+              ))}
+            </select>
+            <input
+              className="input input-bordered input-sm"
+              type="password"
+              placeholder="Password baru (kosongkan jika tidak ubah)"
+              value={editForm.password}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, password: e.target.value }))
+              }
+            />
+          </div>
+          <div className="modal-action">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setEditTarget(null)}
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={updateUser.isPending}
+              onClick={() => updateUser.mutate()}
+            >
+              Simpan
+            </button>
+          </div>
+        </div>
+      </dialog>
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}

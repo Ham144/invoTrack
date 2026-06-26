@@ -28,6 +28,8 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      // UI di-load via file:// — iframe ke go2rtc (127.0.0.1:1984) perlu ini
+      webSecurity: false,
     },
   });
 
@@ -117,6 +119,7 @@ ipcMain.handle(
       scannerId: string;
       usbVendorId: number;
       usbProductId: number;
+      serialPortPath: string;
     },
   ) => {
     if (!runtime) throw new Error("Agent belum siap");
@@ -124,6 +127,7 @@ ipcMain.handle(
       payload.scannerId,
       payload.usbVendorId,
       payload.usbProductId,
+      payload.serialPortPath,
     );
     return runtime.getScanners();
   },
@@ -152,6 +156,73 @@ ipcMain.handle("agent:cctv-snapshot", async (_evt, cctvId: string) => {
   if (!runtime) throw new Error("Agent belum siap");
   const buf = await runtime.captureCctvSnapshot(cctvId);
   return buf.toString("base64");
+});
+
+ipcMain.handle("agent:start-monitor", async () => {
+  if (!runtime) return [];
+  await runtime.startMonitor();
+  return runtime.getMonitorGrid();
+});
+
+ipcMain.handle("agent:resync-monitor", async () => {
+  if (!runtime) return [];
+  await runtime.resyncMonitor();
+  return runtime.getMonitorGrid();
+});
+
+ipcMain.handle("agent:stop-monitor", () => {
+  runtime?.stopMonitor();
+});
+
+ipcMain.handle("agent:get-monitor-grid", () => runtime?.getMonitorGrid() ?? []);
+
+ipcMain.handle("agent:get-active-recordings", () =>
+  runtime?.getActiveRecordings() ?? [],
+);
+
+ipcMain.handle("agent:get-recent-scans", async () => {
+  if (!runtime) return [];
+  return runtime.getRecentScans();
+});
+
+ipcMain.handle("agent:stop-recording", async (_evt, scanId: string) => {
+  if (!runtime) throw new Error("Agent belum siap");
+  await runtime.stopRecording(scanId);
+});
+
+ipcMain.handle("agent:refresh-preview", async (_evt, cctvId: string) => {
+  await runtime?.refreshPreview(cctvId);
+});
+
+ipcMain.handle("agent:start-camera-preview", async (_evt, cctvId: string) => {
+  await runtime?.startCameraPreview(cctvId);
+});
+
+ipcMain.handle("agent:stop-camera-preview", async (_evt, cctvId: string) => {
+  await runtime?.stopCameraPreview(cctvId);
+});
+
+ipcMain.handle(
+  "agent:update-tts-settings",
+  (_evt, payload: { ttsEnabled?: boolean; ttsVolume?: number }) => {
+    if (!runtime) throw new Error("Agent belum siap");
+    return runtime.updateTtsSettings(payload);
+  },
+);
+
+ipcMain.handle("agent:test-tts", () => {
+  runtime?.testTts();
+});
+
+ipcMain.handle("agent:monitor-mode", (_evt, enabled: boolean) => {
+  if (!mainWindow) return;
+  if (enabled) {
+    mainWindow.setMinimumSize(900, 600);
+    mainWindow.setSize(1100, 820);
+  } else {
+    mainWindow.setMinimumSize(400, 500);
+    mainWindow.setSize(520, 720);
+  }
 });
 
 ipcMain.handle(

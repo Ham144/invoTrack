@@ -218,6 +218,35 @@ export class InvoiceScanService {
     });
   }
 
+  async listRecentScansForAgent(
+    organizationName: string,
+    workstationId: string,
+    limit = 25,
+  ) {
+    const rows = await this.prisma.invoiceScan.findMany({
+      where: { organizationName, workstationId },
+      orderBy: { scannedAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        invoiceNumber: true,
+        status: true,
+        scannedAt: true,
+        completedAt: true,
+        scannedByUsername: true,
+      },
+    });
+
+    return rows.map((row) => ({
+      scanId: row.id,
+      invoiceNumber: row.invoiceNumber,
+      status: row.status,
+      scannedAt: row.scannedAt.toISOString(),
+      completedAt: row.completedAt?.toISOString() ?? null,
+      operatorUsername: row.scannedByUsername,
+    }));
+  }
+
   async listActiveRecordingMeta(): Promise<
     { scanId: string; scannedAt: Date; maxDurationSec: number }[]
   > {

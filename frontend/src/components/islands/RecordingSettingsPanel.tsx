@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { OrganizationApi } from "@/api/organization";
 import { extractApiErrorMessage } from "@/lib/api-error";
+import { canManageInfrastructure } from "@/lib/permissions";
+import { useSessionStore } from "@/stores/sessionStore";
 
 function formatDuration(sec: number) {
   if (sec <= 0) return "Tanpa batas waktu";
@@ -14,6 +16,8 @@ function formatDuration(sec: number) {
 
 export default function RecordingSettingsPanel() {
   const qc = useQueryClient();
+  const user = useSessionStore((s) => s.user);
+  const canEdit = canManageInfrastructure(user?.role);
   const { data, isLoading } = useQuery({
     queryKey: ["org-settings"],
     queryFn: async () => {
@@ -62,6 +66,12 @@ export default function RecordingSettingsPanel() {
   return (
     <div className="card bg-base-100 border border-base-300">
       <div className="card-body gap-5">
+        {!canEdit && (
+          <div className="alert alert-warning text-sm py-3">
+            Mode baca saja — hanya Admin Organisasi yang dapat mengubah
+            pengaturan rekam.
+          </div>
+        )}
         <div>
           <h3 className="font-semibold text-lg">Pengaturan Rekam</h3>
           <p className="text-sm text-base-content/70 mt-1">
@@ -80,6 +90,7 @@ export default function RecordingSettingsPanel() {
             type="checkbox"
             className="checkbox checkbox-primary"
             checked={noLimit}
+            disabled={!canEdit}
             onChange={(e) => setNoLimit(e.target.checked)}
           />
           <span className="text-sm">Tanpa batas waktu (hanya auto-cut scan berikutnya)</span>
@@ -96,6 +107,7 @@ export default function RecordingSettingsPanel() {
               max={120}
               className="input input-bordered"
               value={minutes}
+              disabled={!canEdit}
               onChange={(e) => setMinutes(Math.max(1, Number(e.target.value) || 1))}
             />
           </div>
@@ -111,14 +123,16 @@ export default function RecordingSettingsPanel() {
           </span>
         </div>
 
-        <button
-          type="button"
-          className="btn btn-primary w-fit"
-          disabled={save.isPending}
-          onClick={() => save.mutate()}
-        >
-          {save.isPending ? "Menyimpan..." : "Simpan pengaturan"}
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            className="btn btn-primary w-fit"
+            disabled={save.isPending}
+            onClick={() => save.mutate()}
+          >
+            {save.isPending ? "Menyimpan..." : "Simpan pengaturan"}
+          </button>
+        )}
       </div>
     </div>
   );

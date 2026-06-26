@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AuthApi } from "@/api/auth";
@@ -7,6 +7,10 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { PaginatedMembers } from "@/types/auth";
 import { ROLE } from "@/types/auth";
 import { AGENT_DOWNLOAD_LABEL, AGENT_DOWNLOAD_URL } from "@/lib/agent-download";
+import { formatDiskGb, formatLastSeen, isAgentOnline, isDiskLow } from "@/lib/format";
+import { canManageInfrastructure } from "@/lib/permissions";
+import AgentWorkstationSettings from "@/components/islands/AgentWorkstationSettings";
+import { useSessionStore } from "@/stores/sessionStore";
 import type {
   AgentPairingResult,
   AgentStatus,
@@ -18,6 +22,8 @@ import type {
 
 export default function WorkstationScannerSettings() {
   const qc = useQueryClient();
+  const user = useSessionStore((s) => s.user);
+  const canEdit = canManageInfrastructure(user?.role);
   const [wsLabel, setWsLabel] = useState("");
   const [selectedWs, setSelectedWs] = useState<string>("");
   const [scannerForm, setScannerForm] = useState({
@@ -29,6 +35,7 @@ export default function WorkstationScannerSettings() {
   const [deleteScanner, setDeleteScanner] = useState<ScannerConfig | null>(
     null,
   );
+  const [editScanner, setEditScanner] = useState<ScannerConfig | null>(null);
   const [pairingResult, setPairingResult] = useState<AgentPairingResult | null>(
     null,
   );
@@ -92,6 +99,25 @@ export default function WorkstationScannerSettings() {
     enabled: Boolean(activeWs),
     refetchInterval: 20_000,
   });
+
+  const wsAgentStatuses = useQueries({
+    queries: wsList.map((ws) => ({
+      queryKey: ["agent-status", ws.id],
+      queryFn: async () => {
+        const res = await BuktiScanApi.agentStatus(ws.id);
+        return res.data as AgentStatus;
+      },
+      staleTime: 20_000,
+      refetchInterval: 30_000,
+    })),
+  });
+
+  const agentOnlineByWs = new Map(
+    wsList.map((ws, i) => {
+      const lastSeen = wsAgentStatuses[i]?.data?.agentLastSeenAt;
+      return [ws.id, lastSeen ? isAgentOnline(lastSeen) : false] as const;
+    }),
+  );
 
   const generatePairing = useMutation({
     mutationFn: async () => {
@@ -208,11 +234,11 @@ export default function WorkstationScannerSettings() {
                 onClick={() => setSelectedWs(ws.id)}
               >
                 {ws.label}
-                {ws.lastSeenAt && (
+                {agentOnlineByWs.get(ws.id) ? (
                   <span className="badge badge-xs badge-success ml-1">
                     online
                   </span>
-                )}
+                ) : null}
               </button>
             ))}
           </div>
@@ -226,7 +252,7 @@ export default function WorkstationScannerSettings() {
             <button
               type="button"
               className="btn btn-sm btn-primary"
-              disabled={!wsLabel.trim() || createWs.isPending}
+              disabled={!wsLabel.trim() || createWs.isPending || !canEdit}
               onClick={() => createWs.mutate()}
             >
               Tambah workstation
@@ -304,6 +330,26 @@ export default function WorkstationScannerSettings() {
                   : ""}
               </p>
             )}
+            {agentStatus.data?.diskFreeBytes != null && (
+              <p
+                className={`text-xs ${
+                  isDiskLow(agentStatus.data.diskFreeBytes)
+                    ? "text-error font-medium"
+                    : "text-base-content/50"
+                }`}
+              >
+                Ruang disk PC kasir: {formatDiskGb(agentStatus.data.diskFreeBytes)}
+                {isDiskLow(agentStatus.data.diskFreeBytes)
+                  ? " — segera kosongkan drive klip"
+                  : ""}
+              </p>
+            )}
+
+            <AgentWorkstationSettings
+              workstationId={activeWs}
+              status={agentStatus.data}
+              canEdit={canEdit}
+            />
           </div>
         </section>
       )}
@@ -375,7 +421,8 @@ export default function WorkstationScannerSettings() {
                 createScanner.isPending ||
                 !scannerForm.label.trim() ||
                 !scannerForm.cctvConfigId ||
-                quotaFull
+                quotaFull ||
+                !canEdit
               }
               onClick={() => createScanner.mutate()}
             >
@@ -407,10 +454,10 @@ export default function WorkstationScannerSettings() {
                         {s.cctvConfig?.label ?? "—"}
                       </p>
                       <p className="text-xs font-mono text-base-content/50 mt-1">
-                        USB:{" "}
+                        COM: {s.serialPortPath ?? "belum di-pair"}
                         {s.usbVendorId != null
-                          ? `${s.usbVendorId}:${s.usbProductId}`
-                          : "belum di-pair"}
+                          ? ` · USB ${s.usbVendorId}:${s.usbProductId}`
+                          : ""}
                         {" · "}
                         {s.baudRate} baud
                       </p>
@@ -427,7 +474,16 @@ export default function WorkstationScannerSettings() {
                       )}
                       <button
                         type="button"
+                        className="btn btn-xs btn-outline"
+                        disabled={!canEdit}
+                        onClick={() => setEditScanner(s)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
                         className="btn btn-xs btn-error btn-outline"
+                        disabled={!canEdit}
                         onClick={() => setDeleteScanner(s)}
                       >
                         Hapus
@@ -440,6 +496,91 @@ export default function WorkstationScannerSettings() {
           </ul>
         )}
       </section>
+
+      <dialog className={`modal ${editScanner ? "modal-open" : ""}`}>
+        <div className="modal-box">
+          <h3 className="font-bold text-lg">Edit Scanner</h3>
+          {editScanner && (
+            <div className="py-4 grid gap-3">
+              <input
+                className="input input-bordered input-sm"
+                defaultValue={editScanner.label}
+                id="edit-scanner-label"
+              />
+              <select
+                className="select select-bordered select-sm"
+                defaultValue={editScanner.assignedUsername ?? ""}
+                id="edit-scanner-operator"
+              >
+                <option value="">Tanpa operator</option>
+                {(members.data?.items ?? []).map((m) => (
+                  <option key={m.username} value={m.username}>
+                    {m.displayName}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="select select-bordered select-sm"
+                defaultValue={editScanner.cctvConfigId}
+                id="edit-scanner-cctv"
+              >
+                {(cctvList.data ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="modal-action">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setEditScanner(null)}
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                if (!editScanner) return;
+                const label = (
+                  document.getElementById(
+                    "edit-scanner-label",
+                  ) as HTMLInputElement
+                ).value.trim();
+                const assignedUsername = (
+                  document.getElementById(
+                    "edit-scanner-operator",
+                  ) as HTMLSelectElement
+                ).value;
+                const cctvConfigId = (
+                  document.getElementById(
+                    "edit-scanner-cctv",
+                  ) as HTMLSelectElement
+                ).value;
+                updateScanner.mutate({
+                  id: editScanner.id,
+                  body: {
+                    label,
+                    assignedUsername: assignedUsername || null,
+                    cctvConfigId,
+                  },
+                });
+                setEditScanner(null);
+              }}
+            >
+              Simpan
+            </button>
+          </div>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button type="button" onClick={() => setEditScanner(null)}>
+            close
+          </button>
+        </form>
+      </dialog>
 
       <ConfirmDialog
         open={Boolean(deleteScanner)}

@@ -17,6 +17,7 @@ import {
   AgentPairDto,
   AgentPairUsbDto,
   AgentReconcileClipsDto,
+  UpdateAgentSettingsDto,
 } from './dto/agent.dto';
 
 @Controller('agent')
@@ -66,6 +67,12 @@ export class AgentController {
   }
 
   @UseGuards(AgentAuthGuard)
+  @Get('recent-scans')
+  recentScans(@AgentAuth() agent: AgentContext) {
+    return this.service.listRecentScans(agent);
+  }
+
+  @UseGuards(AgentAuthGuard)
   @Post('recording/:scanId/fail')
   failRecording(
     @AgentAuth() agent: AgentContext,
@@ -95,6 +102,7 @@ export class AgentController {
       scannerId,
       dto.usbVendorId,
       dto.usbProductId,
+      dto.serialPortPath,
     );
   }
 }

@@ -59,4 +59,20 @@ export const BuktiScanApi = {
     axiosInstance.post(`/api/workstation/${workstationId}/agent/pairing-code`),
   agentStatus: (workstationId: string) =>
     axiosInstance.get(`/api/workstation/${workstationId}/agent/status`),
+  agentUpdateSettings: (
+    workstationId: string,
+    body: {
+      ttsEnabled?: boolean;
+      ttsVolume?: number;
+      clipsDir?: string;
+    },
+  ) =>
+    axiosInstance.patch(
+      `/api/workstation/${workstationId}/agent/settings`,
+      body,
+    ),
+  cctvSnapshot: (id: string) =>
+    axiosInstance.get(`/api/cctv-config/${id}/snapshot`, {
+      responseType: "blob",
+    }),
 };

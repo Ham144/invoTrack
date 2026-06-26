@@ -1,6 +1,7 @@
 import { SerialPort } from "serialport";
 import type { AgentScannerConfig } from "./api-client";
-import { parseScanLines, parseUsbId } from "./scan-parse";
+import { parseScanLines } from "./scan-parse";
+import { resolveSerialPortPath } from "./serial-resolve";
 
 export type ScanHandler = (
   scannerId: string,
@@ -59,47 +60,21 @@ export class SerialManager {
   ): Promise<void> {
     if (this.sessions.has(scanner.id)) return;
 
-    const ports = await SerialPort.list();
-    let targetPath: string | undefined;
-
-    if (scanner.usbVendorId != null && scanner.usbProductId != null) {
-      const vid = scanner.usbVendorId
-        .toString(16)
-        .padStart(4, "0")
-        .toLowerCase();
-      const pid = scanner.usbProductId
-        .toString(16)
-        .padStart(4, "0")
-        .toLowerCase();
-      const match = ports.find((p) => {
-        const pVid = parseUsbId(p.vendorId)
-          ?.toString(16)
-          .padStart(4, "0")
-          .toLowerCase();
-        const pPid = parseUsbId(p.productId)
-          ?.toString(16)
-          .padStart(4, "0")
-          .toLowerCase();
-        return pVid === vid && pPid === pid;
-      });
-      targetPath = match?.path;
-    }
-
-    if (!targetPath && ports.length === 1 && !this.usedPaths.has(ports[0].path)) {
-      targetPath = ports[0].path;
-    }
+    const ports = await listSerialPorts();
+    const targetPath = resolveSerialPortPath(scanner, ports, this.usedPaths);
 
     if (!targetPath) {
-      const msg =
-        scanner.usbVendorId != null
-          ? "Port USB tidak ditemukan — colok scanner dan pair ulang"
+      const msg = scanner.serialPortPath?.trim()
+        ? `Port ${scanner.serialPortPath} tidak ditemukan — colok scanner dan pair ulang`
+        : scanner.usbVendorId != null
+          ? "Port USB tidak ditemukan — colok scanner dan pair ulang di tab Scanner"
           : "Belum pair USB — pilih port COM di tab Scanner";
       this.lastErrors.set(scanner.id, msg);
       throw new Error(msg);
     }
 
     if (this.usedPaths.has(targetPath)) {
-      const msg = `Port ${targetPath} sudah dipakai scanner lain — satu USB hanya untuk satu scanner`;
+      const msg = `Port ${targetPath} sudah dipakai scanner lain — satu COM hanya untuk satu scanner`;
       this.lastErrors.set(scanner.id, msg);
       throw new Error(msg);
     }

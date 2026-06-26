@@ -1,15 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
+  ActiveRecordingView,
   AgentScannerView,
   ListedSerialPortView,
+  MonitorCellView,
+  RecentScanView,
   RuntimeStatusView,
   ScannerLinkView,
 } from "../../electron/preload";
 import { findDuplicateUsbBindings, parseUsbId } from "../core/scan-parse";
+import { LiveRtcPlayer } from "./LiveRtcPlayer";
 
-const AGENT_VERSION = "0.1.2";
+const AGENT_VERSION = "0.1.3";
 
-type Tab = "beranda" | "kamera" | "scanner" | "penyimpanan" | "tentang";
+type Tab = "beranda" | "monitor" | "kamera" | "scanner" | "penyimpanan" | "tentang";
 
 interface AgentConfig {
   apiBaseUrl: string;
@@ -17,10 +21,13 @@ interface AgentConfig {
   organizationName?: string;
   workstationLabel?: string;
   clipsDir: string;
+  ttsEnabled?: boolean;
+  ttsVolume?: number;
 }
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "beranda", label: "Beranda" },
+  { id: "monitor", label: "Monitor" },
   { id: "kamera", label: "Kamera" },
   { id: "scanner", label: "Scanner" },
   { id: "penyimpanan", label: "Penyimpanan" },
@@ -35,9 +42,52 @@ function portLabel(port: ListedSerialPortView): string {
   return `${port.path}${ids}${maker}`;
 }
 
+function currentMonthClipsSubdir(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function formatSyncedAt(iso: string | null | undefined): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString("id-ID");
+}
+
+function DiskLowBanner({ status }: { status: RuntimeStatusView }) {
+  if (!status.diskLow) return null;
+  return (
+    <div
+      style={{
+        ...S.warn,
+        background: "#fef2f2",
+        borderColor: "#fca5a5",
+        color: "#991b1b",
+        marginBottom: 12,
+      }}
+    >
+      <strong>Disk hampir penuh.</strong> Tersisa {status.diskFreeLabel ?? "—"} di
+      drive folder klip. Kosongkan ruang atau pindahkan folder klip sebelum rekam
+      gagal.
+    </div>
+  );
+}
+
+function TtsRemoteHintCard({ config }: { config: AgentConfig | null }) {
+  const enabled = config?.ttsEnabled !== false;
+  const volume = config?.ttsVolume ?? 80;
+
+  return (
+    <div style={S.card}>
+      <div style={S.label}>Suara saat mulai rekam</div>
+      <p style={{ ...S.hint, marginTop: 8 }}>
+        Diatur dari <strong>dashboard web</strong> → Perangkat → Workstation &amp;
+        Scanner → Pengaturan Agent.
+      </p>
+      <p style={{ ...S.hint, marginTop: 6 }}>
+        Status: {enabled ? `aktif (volume ${volume})` : "nonaktif"} — sinkron
+        otomatis ~30 detik.
+      </p>
+    </div>
+  );
 }
 
 const S = {
@@ -327,6 +377,7 @@ export default function App() {
         scannerId,
         usbVendorId,
         usbProductId,
+        serialPortPath: port.path,
       });
       const s = await window.BuktiScanAgent.refreshConfig();
       applyStatus(s);
@@ -447,17 +498,19 @@ export default function App() {
 
       <div style={S.content}>
         {tab === "beranda" && (
-          <TabBeranda status={status} config={config} onNavigate={setTab} />
+          <TabBeranda
+            status={status}
+            config={config}
+            onNavigate={setTab}
+            onConfigUpdated={() => void refresh()}
+          />
         )}
+        {tab === "monitor" && <TabMonitor />}
         {tab === "kamera" && (
           <TabKamera
             cctvs={cctvs}
             activeCctvId={previewCctvId}
             onSelectCctv={setPreviewCctvId}
-            previewUrl={previewUrl}
-            previewLoading={previewLoading}
-            previewError={previewError}
-            onLoadPreview={() => void loadPreview()}
           />
         )}
         {tab === "scanner" && (
@@ -499,20 +552,146 @@ export default function App() {
   );
 }
 
+function scanStatusLabel(status: string): string {
+  switch (status) {
+    case "RECORDING":
+      return "Rekam";
+    case "COMPLETED":
+      return "Selesai";
+    case "FAILED":
+      return "Gagal";
+    default:
+      return status;
+  }
+}
+
+function RecentScansCard() {
+  const [rows, setRows] = useState<RecentScanView[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = () => {
+      void window.BuktiScanAgent.getRecentScans().then((data) => {
+        setRows(data);
+        setLoading(false);
+      });
+    };
+    load();
+    const timer = setInterval(load, 10_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div style={S.card}>
+      <div style={S.label}>Riwayat scan (PC ini)</div>
+      <p style={{ ...S.hint, marginTop: 0, marginBottom: 8 }}>
+        Daftar lengkap + video ada di dashboard web → Scan Log. Di sini hanya
+        ringkasan workstation ini.
+      </p>
+      {loading ? (
+        <p style={{ color: "#94a3b8", fontSize: 12, margin: 0 }}>Memuat…</p>
+      ) : !rows.length ? (
+        <p style={{ color: "#94a3b8", fontSize: 12, margin: 0 }}>
+          Belum ada scan hari ini.
+        </p>
+      ) : (
+        <ul
+          style={{
+            margin: 0,
+            padding: 0,
+            listStyle: "none",
+            display: "grid",
+            gap: 6,
+            maxHeight: 220,
+            overflowY: "auto",
+          }}
+        >
+          {rows.map((row) => (
+            <li
+              key={row.scanId}
+              style={{
+                fontSize: 12,
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+                borderBottom: "1px solid #f1f5f9",
+                paddingBottom: 4,
+              }}
+            >
+              <span>
+                <strong>{row.invoiceNumber}</strong>
+                {row.operatorUsername ? (
+                  <span style={{ color: "#64748b" }}> · {row.operatorUsername}</span>
+                ) : null}
+              </span>
+              <span style={{ textAlign: "right", flexShrink: 0 }}>
+                <span
+                  style={
+                    row.status === "COMPLETED"
+                      ? S.badgeGreen
+                      : row.status === "FAILED"
+                        ? S.badgeRed
+                        : S.badgeBlue
+                  }
+                >
+                  {scanStatusLabel(row.status)}
+                </span>
+                <span
+                  style={{
+                    display: "block",
+                    color: "#94a3b8",
+                    fontSize: 10,
+                    marginTop: 2,
+                  }}
+                >
+                  {new Date(row.scannedAt).toLocaleTimeString("id-ID")}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function TabBeranda({
   status,
   config,
   onNavigate,
+  onConfigUpdated,
 }: {
   status: RuntimeStatusView;
   config: AgentConfig | null;
   onNavigate: (tab: Tab) => void;
+  onConfigUpdated: () => void;
 }) {
   const links = status.scanners ?? [];
   const anyConnected = links.some((l) => l.connected);
+  const [activeRecs, setActiveRecs] = useState<ActiveRecordingView[]>([]);
+  const [stoppingId, setStoppingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!status.recording) {
+      setActiveRecs([]);
+      return;
+    }
+    void window.BuktiScanAgent.getActiveRecordings().then(setActiveRecs);
+  }, [status.recording]);
+
+  const handleStop = async (scanId: string) => {
+    setStoppingId(scanId);
+    try {
+      await window.BuktiScanAgent.stopRecording(scanId);
+      setActiveRecs((prev) => prev.filter((r) => r.scanId !== scanId));
+    } finally {
+      setStoppingId(null);
+    }
+  };
 
   return (
     <div>
+      <DiskLowBanner status={status} />
       <div
         style={{
           ...S.warn,
@@ -540,9 +719,9 @@ function TabBeranda({
             <div style={S.label}>Status rekam</div>
             <div>
               {status.recording ? (
-                <span style={S.badgeBlue}>Merekam {status.lastScan ?? ""}</span>
+                <span style={S.badgeBlue}>● Merekam {status.lastScan ?? ""}</span>
               ) : (
-                <span style={S.badgeGreen}>Siap scan</span>
+                <span style={S.badgeGreen}>○ Siap scan</span>
               )}
             </div>
           </div>
@@ -569,6 +748,15 @@ function TabBeranda({
           <div>
             <div style={S.label}>File MP4 lokal</div>
             <div style={S.value}>{status.localClipCount ?? 0}</div>
+          </div>
+          <div>
+            <div style={S.label}>Ruang disk tersisa</div>
+            <div style={S.value}>
+              {status.diskFreeLabel ?? "—"}
+              {status.diskLow ? (
+                <span style={{ ...S.badgeRed, marginLeft: 6 }}>Rendah</span>
+              ) : null}
+            </div>
           </div>
         </div>
 
@@ -601,6 +789,43 @@ function TabBeranda({
           </div>
         )}
       </div>
+
+      {status.recording && activeRecs.length > 0 && (
+        <div style={S.card}>
+          <div style={S.label}>Rekam aktif</div>
+          <ul style={{ margin: "8px 0 0", padding: 0, listStyle: "none", display: "grid", gap: 6 }}>
+            {activeRecs.map((rec) => (
+              <li
+                key={rec.scanId}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12 }}
+              >
+                <span>
+                  <strong>{rec.invoiceNumber}</strong>
+                  {rec.remainingSec > 0 && (
+                    <span style={{ color: "#64748b", marginLeft: 6 }}>
+                      sisa {rec.remainingSec}s
+                    </span>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  style={{
+                    ...S.btnSmall,
+                    background: "#fee2e2",
+                    color: "#dc2626",
+                    border: "1px solid #fca5a5",
+                    opacity: stoppingId === rec.scanId ? 0.6 : 1,
+                  }}
+                  disabled={stoppingId === rec.scanId}
+                  onClick={() => void handleStop(rec.scanId)}
+                >
+                  {stoppingId === rec.scanId ? "Menghentikan…" : "Stop Rekam"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {links.length > 0 && (
         <div style={S.card}>
@@ -635,22 +860,33 @@ function TabBeranda({
         </div>
       )}
 
+      <TtsRemoteHintCard config={config} />
+
+      <RecentScansCard />
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <button
+          type="button"
+          style={S.btnOutline}
+          onClick={() => onNavigate("monitor")}
+        >
+          Monitor live meja →
+        </button>
         <button
           type="button"
           style={S.btnOutline}
           onClick={() => onNavigate("kamera")}
         >
-          Tes preview CCTV →
-        </button>
-        <button
-          type="button"
-          style={S.btnOutline}
-          onClick={() => onNavigate("scanner")}
-        >
-          Pair USB scanner →
+          Preview CCTV →
         </button>
       </div>
+      <button
+        type="button"
+        style={{ ...S.btnOutline, marginTop: 10, width: "100%" }}
+        onClick={() => onNavigate("scanner")}
+      >
+        Pair USB scanner →
+      </button>
     </div>
   );
 }
@@ -659,21 +895,65 @@ function TabKamera({
   cctvs,
   activeCctvId,
   onSelectCctv,
-  previewUrl,
-  previewLoading,
-  previewError,
-  onLoadPreview,
 }: {
   cctvs: AgentScannerView["cctv"][];
   activeCctvId: string;
   onSelectCctv: (id: string) => void;
-  previewUrl: string | null;
-  previewLoading: boolean;
-  previewError: string | null;
-  onLoadPreview: () => void;
 }) {
-  const activeCctv =
-    cctvs.find((c) => c.id === activeCctvId) ?? cctvs[0] ?? null;
+  const activeCctv = cctvs.find((c) => c.id === activeCctvId) ?? cctvs[0] ?? null;
+  const [liveActive, setLiveActive] = useState(false);
+  const [liveKey, setLiveKey] = useState(0);
+  const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [snapshotError, setSnapshotError] = useState<string | null>(null);
+  const prevCctvIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const prev = prevCctvIdRef.current;
+    if (prev && prev !== activeCctv?.id) {
+      void window.BuktiScanAgent.stopCameraPreview(prev);
+      setLiveActive(false);
+      setSnapshotUrl(null);
+    }
+    prevCctvIdRef.current = activeCctv?.id ?? null;
+  }, [activeCctv?.id]);
+
+  useEffect(() => {
+    return () => {
+      if (prevCctvIdRef.current) {
+        void window.BuktiScanAgent.stopCameraPreview(prevCctvIdRef.current);
+      }
+    };
+  }, []);
+
+  const handleStartLive = async () => {
+    if (!activeCctv) return;
+    setSnapshotUrl(null);
+    setSnapshotError(null);
+    try {
+      await window.BuktiScanAgent.startCameraPreview(activeCctv.id);
+      setLiveActive(true);
+      setLiveKey((k) => k + 1);
+    } catch (err) {
+      setLiveActive(false);
+      setSnapshotError(err instanceof Error ? err.message : "Live preview gagal");
+    }
+  };
+
+  const handleSnapshot = async () => {
+    if (!activeCctv) return;
+    setSnapshotLoading(true);
+    setSnapshotError(null);
+    setSnapshotUrl(null);
+    try {
+      const b64 = await window.BuktiScanAgent.captureCctvSnapshot(activeCctv.id);
+      setSnapshotUrl(`data:image/jpeg;base64,${b64}`);
+    } catch (err) {
+      setSnapshotError(err instanceof Error ? err.message : "Snapshot gagal");
+    } finally {
+      setSnapshotLoading(false);
+    }
+  };
 
   if (!cctvs.length) {
     return (
@@ -690,9 +970,9 @@ function TabKamera({
     <div>
       <div style={S.card}>
         <div style={S.label}>Pilih kamera</div>
-        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
           <select
-            style={{ ...S.input, marginTop: 0, flex: 1 }}
+            style={{ ...S.input, marginTop: 0, flex: 1, minWidth: 120 }}
             value={activeCctvId}
             onChange={(e) => onSelectCctv(e.target.value)}
           >
@@ -704,19 +984,25 @@ function TabKamera({
           </select>
           <button
             type="button"
-            style={{ ...S.btnPrimary, opacity: previewLoading ? 0.7 : 1 }}
-            disabled={previewLoading || !activeCctv}
-            onClick={onLoadPreview}
+            style={S.btnPrimary}
+            disabled={!activeCctv}
+            onClick={() => void handleStartLive()}
           >
-            {previewLoading ? "Mengambil..." : "Test Koneksi RTSP"}
+            {liveActive ? "Restart Live" : "Mulai Live"}
+          </button>
+          <button
+            type="button"
+            style={{ ...S.btnOutline, opacity: snapshotLoading ? 0.7 : 1 }}
+            disabled={snapshotLoading || !activeCctv}
+            onClick={() => void handleSnapshot()}
+          >
+            {snapshotLoading ? "Mengambil…" : "Snapshot"}
           </button>
         </div>
 
         {activeCctv && (
           <div style={{ marginTop: 8 }}>
-            <div style={S.label}>
-              URL RTSP (read-only — edit di dashboard web)
-            </div>
+            <div style={S.label}>URL RTSP (read-only — edit di dashboard web)</div>
             <div
               style={{
                 fontFamily: "monospace",
@@ -732,32 +1018,26 @@ function TabKamera({
         )}
       </div>
 
-      <div style={S.previewBox}>
-        {previewUrl ? (
+      <div style={{ ...S.previewBox, padding: 0, overflow: "hidden" }}>
+        {liveActive && activeCctv ? (
+          <LiveRtcPlayer key={liveKey} src={`cctv_${activeCctv.id.replace(/[^a-zA-Z0-9]/g, "_")}`} />
+        ) : snapshotUrl ? (
           <img
-            src={previewUrl}
-            alt="Preview CCTV"
-            style={{ width: "100%", height: "100%", objectFit: "contain" }}
+            src={snapshotUrl}
+            alt="Snapshot CCTV"
+            style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
           />
         ) : (
-          <p
-            style={{
-              color: "#94a3b8",
-              fontSize: 12,
-              padding: 16,
-              textAlign: "center",
-            }}
-          >
-            {previewError ??
-              "Klik 'Test Koneksi RTSP' untuk tes apakah kamera dapat diakses dari PC ini."}
+          <p style={{ color: "#94a3b8", fontSize: 12, padding: 16, textAlign: "center", margin: 0 }}>
+            {snapshotError ?? "Klik 'Mulai Live' untuk preview live atau 'Snapshot' untuk tes satu frame."}
           </p>
         )}
       </div>
-      {previewError && (
-        <p style={{ ...S.error, marginTop: 8 }}>{previewError}</p>
+      {snapshotError && !liveActive && (
+        <p style={{ ...S.error, marginTop: 8 }}>{snapshotError}</p>
       )}
       <p style={S.hint}>
-        Snapshot diambil langsung dari LAN toko — bukan dari server cloud.
+        Live preview substream via go2rtc. Snapshot diambil langsung dari LAN.
       </p>
     </div>
   );
@@ -1013,6 +1293,7 @@ function TabPenyimpanan({
 
   return (
     <div>
+      <DiskLowBanner status={status} />
       <div style={S.card}>
         <div style={S.label}>Folder klip</div>
         <div
@@ -1033,6 +1314,35 @@ function TabPenyimpanan({
         >
           {opening ? "Membuka..." : "Buka folder di Explorer"}
         </button>
+      </div>
+
+      <div style={S.card}>
+        <div style={S.label}>Struktur penyimpanan</div>
+        <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.5 }}>
+          MP4 final disimpan per bulan-tahun:
+          <div
+            style={{
+              fontFamily: "monospace",
+              marginTop: 6,
+              padding: "8px 10px",
+              background: "#f8fafc",
+              borderRadius: 6,
+              wordBreak: "break-all",
+            }}
+          >
+            {(status.clipsDir || config?.clipsDir || "D:\\BuktiScan\\clips")}/
+            {currentMonthClipsSubdir()}/
+            {"{invoice}.mp4"}
+          </div>
+        </div>
+        <div style={{ marginTop: 10, fontSize: 12, color: "#64748b" }}>
+          Ruang disk tersisa: <strong>{status.diskFreeLabel ?? "—"}</strong>
+          {status.diskLow ? (
+            <span style={{ color: "#dc2626", marginLeft: 6 }}>
+              — segera kosongkan drive
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div style={S.card}>
@@ -1069,9 +1379,316 @@ function TabPenyimpanan({
   );
 }
 
+function TabMonitor() {
+  const [cells, setCells] = useState<MonitorCellView[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [bootError, setBootError] = useState<string | null>(null);
+  const [stoppingId, setStoppingId] = useState<string | null>(null);
+  const [snapshotCell, setSnapshotCell] = useState<{ label: string; src: string } | null>(null);
+  const activeRef = useRef(true);
+
+  useEffect(() => {
+    activeRef.current = true;
+
+    const boot = async () => {
+      setLoading(true);
+      setBootError(null);
+      try {
+        await window.BuktiScanAgent.setMonitorMode(true);
+        const rows = await window.BuktiScanAgent.startMonitor();
+        if (activeRef.current) setCells(rows);
+      } catch (err) {
+        if (activeRef.current) {
+          setBootError(err instanceof Error ? err.message : "Gagal menghubungkan stream");
+        }
+      } finally {
+        if (activeRef.current) setLoading(false);
+      }
+    };
+
+    void boot();
+
+    const poll = setInterval(() => {
+      void window.BuktiScanAgent.getMonitorGrid().then((rows) => {
+        if (activeRef.current) setCells(rows);
+      });
+    }, 2000);
+
+    return () => {
+      activeRef.current = false;
+      clearInterval(poll);
+      void window.BuktiScanAgent.stopMonitor();
+      void window.BuktiScanAgent.setMonitorMode(false);
+    };
+  }, []);
+
+  const handleStop = async (scanId: string) => {
+    setStoppingId(scanId);
+    try {
+      await window.BuktiScanAgent.stopRecording(scanId);
+    } finally {
+      setStoppingId(null);
+    }
+  };
+
+  const handleSnapshot = async (cctvId: string, label: string) => {
+    try {
+      const b64 = await window.BuktiScanAgent.captureCctvSnapshot(cctvId);
+      setSnapshotCell({ label, src: `data:image/jpeg;base64,${b64}` });
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleRetryBoot = async () => {
+    setLoading(true);
+    setBootError(null);
+    try {
+      const rows = await window.BuktiScanAgent.startMonitor();
+      if (activeRef.current) setCells(rows);
+    } catch (err) {
+      if (activeRef.current) {
+        setBootError(err instanceof Error ? err.message : "Gagal menghubungkan stream");
+      }
+    } finally {
+      if (activeRef.current) setLoading(false);
+    }
+  };
+
+  const handleRefreshAll = async () => {
+    const rows = await window.BuktiScanAgent.resyncMonitor();
+    if (activeRef.current) setCells(rows);
+  };
+
+  if (loading) {
+    return (
+      <div style={S.card}>
+        <p style={{ color: "#64748b", margin: 0 }}>Menyiapkan stream kamera…</p>
+      </div>
+    );
+  }
+
+  if (bootError) {
+    return (
+      <div style={S.card}>
+        <p style={{ ...S.error, margin: 0 }}>{bootError}</p>
+        <p style={S.hint}>
+          Pastikan go2rtc.exe ada di folder agent, port 1984 tidak dipakai aplikasi lain,
+          dan URL RTSP substream benar di dashboard web.
+        </p>
+        <button type="button" style={S.btnPrimary} onClick={() => void handleRetryBoot()}>
+          Coba lagi
+        </button>
+      </div>
+    );
+  }
+
+  if (!cells.length) {
+    return (
+      <div style={S.card}>
+        <p style={{ color: "#64748b", margin: 0 }}>Belum ada CCTV di workstation ini.</p>
+        <p style={S.hint}>Tambahkan scanner + CCTV di dashboard web → Perangkat.</p>
+      </div>
+    );
+  }
+
+  const cols = cells.length <= 2 ? 1 : cells.length <= 4 ? 2 : 3;
+  const recCount = cells.filter((c) => c.state === "recording").length;
+  const offlineCount = cells.filter((c) => !c.scannerConnected).length;
+
+  return (
+    <div>
+      {/* Toolbar */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ flex: 1, fontSize: 12, color: "#64748b" }}>
+          Live substream via go2rtc.{" "}
+          {recCount > 0 && <span style={{ color: "#b45309", fontWeight: 600 }}>{recCount} rekam aktif.</span>}
+          {offlineCount > 0 && <span style={{ color: "#dc2626" }}> {offlineCount} scanner putus.</span>}
+        </div>
+        <button type="button" style={S.btnSmall} onClick={() => void handleRefreshAll()}>
+          Refresh semua
+        </button>
+        <button
+          type="button"
+          style={S.btnSmall}
+          onClick={() => void window.BuktiScanAgent.refreshConfig()}
+        >
+          Sync config
+        </button>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+          gap: 10,
+        }}
+      >
+        {cells.map((cell, index) => (
+          <div
+            key={cell.cctvId}
+            style={{
+              ...S.card,
+              marginBottom: 0,
+              padding: 0,
+              overflow: "hidden",
+              borderColor: cell.state === "recording" ? "#fbbf24" : "#e2e8f0",
+              borderWidth: cell.state === "recording" ? 2 : 1,
+            }}
+          >
+            <div style={{ position: "relative", aspectRatio: "16/9" }}>
+              <LiveRtcPlayer
+                src={cell.previewSrc}
+                baseUrl={cell.go2rtcBaseUrl}
+              />
+              {/* Status badges overlay */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: 6,
+                  left: 6,
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 3,
+                  pointerEvents: "none",
+                }}
+              >
+                {cell.state === "recording" ? (
+                  <span style={S.badgeAmber}>
+                    ● REKAM {cell.invoiceNumber}
+                    {cell.remainingSec != null && ` ${cell.remainingSec}s`}
+                  </span>
+                ) : (
+                  <span style={S.badgeGreen}>○ IDLE</span>
+                )}
+                {cell.scannerConnected ? (
+                  <span style={S.badgeGreen}>Scanner OK</span>
+                ) : (
+                  <span style={S.badgeRed}>Scanner putus</span>
+                )}
+              </div>
+              {/* Refresh stream button */}
+              <button
+                type="button"
+                title="Refresh stream"
+                style={{
+                  position: "absolute",
+                  top: 6,
+                  right: 6,
+                  background: "rgba(0,0,0,0.5)",
+                  border: "none",
+                  borderRadius: 4,
+                  color: "#fff",
+                  fontSize: 11,
+                  padding: "2px 6px",
+                  cursor: "pointer",
+                }}
+                onClick={() => void window.BuktiScanAgent.refreshPreview(cell.cctvId)}
+              >
+                ↺
+              </button>
+            </div>
+
+            <div style={{ padding: "8px 10px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 12 }}>{cell.scannerLabel}</div>
+                  <div style={{ color: "#64748b", fontSize: 11, marginTop: 1 }}>
+                    {cell.cctvLabel}
+                    {cell.operatorUsername ? ` · ${cell.operatorUsername}` : ""}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    style={S.btnSmall}
+                    title="Ambil snapshot"
+                    onClick={() => void handleSnapshot(cell.cctvId, cell.cctvLabel)}
+                  >
+                    📷
+                  </button>
+                  {cell.state === "recording" && cell.scanId && (
+                    <button
+                      type="button"
+                      style={{
+                        ...S.btnSmall,
+                        background: "#fee2e2",
+                        color: "#dc2626",
+                        border: "1px solid #fca5a5",
+                        opacity: stoppingId === cell.scanId ? 0.6 : 1,
+                      }}
+                      disabled={stoppingId === cell.scanId}
+                      onClick={() => void handleStop(cell.scanId!)}
+                    >
+                      {stoppingId === cell.scanId ? "…" : "Stop"}
+                    </button>
+                  )}
+                </div>
+              </div>
+              {cell.previewError && (
+                <p style={{ ...S.error, marginTop: 4, marginBottom: 0, fontSize: 11 }}>
+                  {cell.previewError}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Snapshot modal */}
+      {snapshotCell && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 999,
+          }}
+          onClick={() => setSnapshotCell(null)}
+        >
+          <div style={{ maxWidth: "90vw", maxHeight: "80vh", textAlign: "center" }}>
+            <div style={{ color: "#fff", marginBottom: 8, fontSize: 13 }}>{snapshotCell.label}</div>
+            <img
+              src={snapshotCell.src}
+              alt={snapshotCell.label}
+              style={{ maxWidth: "100%", maxHeight: "70vh", borderRadius: 6 }}
+            />
+            <div style={{ color: "#94a3b8", marginTop: 8, fontSize: 11 }}>Klik untuk tutup</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TabTentang({ config }: { config: AgentConfig | null }) {
   return (
     <div>
+      <div style={S.card}>
+        <div style={S.label}>Peran aplikasi</div>
+        <p style={{ fontSize: 12, color: "#475569", lineHeight: 1.55, margin: "6px 0 0" }}>
+          <strong>Agent (aplikasi ini)</strong> jalan di PC kasir: baca scanner USB,
+          rekam CCTV, simpan MP4 lokal, sinkron ke cloud. Tab Scanner/Kamera/Monitor
+          hanya untuk <em>operasional &amp; tes</em> — bukan tempat edit konfigurasi.
+        </p>
+        <p style={{ fontSize: 12, color: "#475569", lineHeight: 1.55, margin: "10px 0 0" }}>
+          <strong>Dashboard web</strong> untuk admin: buat workstation, assign operator +
+          CCTV, lihat Scan Log lengkap, kelola organisasi. Satu sumber konfigurasi
+          (server); agent hanya menarik config dan menjalankannya.
+        </p>
+      </div>
+
       <div style={S.card}>
         <div style={S.grid2}>
           <div>

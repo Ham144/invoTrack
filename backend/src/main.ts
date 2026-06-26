@@ -10,8 +10,8 @@ function getCorsOrigins(): string[] {
   const dev =
     process.env.FRONTEND_URL_DEV ||
     'http://localhost:4321,http://127.0.0.1:4321';
-  const prod = process.env.FRONTEND_URL_PROD;
-  if (process.env.NODE_ENV === 'production' && prod) {
+  const prod = process.env.FRONTEND_URL;
+  if (prod) {
     return [prod];
   }
   const origins = dev

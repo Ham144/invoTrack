@@ -14,6 +14,7 @@ import {
   AgentHeartbeatDto,
   AgentIngestDto,
   AgentPairDto,
+  UpdateAgentSettingsDto,
 } from './dto/agent.dto';
 
 const PAIRING_TTL_MS = 15 * 60 * 1000;
@@ -80,8 +81,46 @@ export class AgentService {
       agentLastSeenAt: device?.lastSeenAt ?? null,
       agentVersion: device?.agentVersion ?? null,
       clipsDir: device?.clipsDir ?? null,
+      diskFreeBytes:
+        device?.diskFreeBytes != null ? Number(device.diskFreeBytes) : null,
+      diskCheckedAt: device?.diskCheckedAt ?? null,
+      ttsEnabled: device?.ttsEnabled ?? true,
+      ttsVolume: device?.ttsVolume ?? 80,
       pairingExpiresAt: device?.pairingExpiresAt ?? null,
     };
+  }
+
+  async updateAgentSettings(
+    workstationId: string,
+    userInfo: TokenPayload,
+    dto: UpdateAgentSettingsDto,
+  ) {
+    const ws = await this.prisma.workstation.findFirst({
+      where: {
+        id: workstationId,
+        organizationName: userInfo.organizationName,
+      },
+      include: { agentDevice: true },
+    });
+    if (!ws) throw new NotFoundException('Workstation tidak ditemukan');
+    if (!ws.agentDevice) {
+      throw new BadRequestException(
+        'Agent belum dibuat — generate kode pairing dulu',
+      );
+    }
+
+    await this.prisma.agentDevice.update({
+      where: { workstationId },
+      data: {
+        ...(dto.ttsEnabled !== undefined ? { ttsEnabled: dto.ttsEnabled } : {}),
+        ...(dto.ttsVolume !== undefined ? { ttsVolume: dto.ttsVolume } : {}),
+        ...(dto.clipsDir !== undefined
+          ? { clipsDir: dto.clipsDir.trim() }
+          : {}),
+      },
+    });
+
+    return this.getAgentStatus(workstationId, userInfo);
   }
 
   async pair(dto: AgentPairDto) {
@@ -159,7 +198,7 @@ export class AgentService {
 
     const device = await this.prisma.agentDevice.findUnique({
       where: { workstationId: agent.workstationId },
-      select: { clipsDir: true },
+      select: { clipsDir: true, ttsEnabled: true, ttsVolume: true },
     });
 
     return {
@@ -167,12 +206,15 @@ export class AgentService {
       workstationId: agent.workstationId,
       recordingMaxDurationSec: org?.recordingMaxDurationSec ?? 300,
       clipsDir: device?.clipsDir ?? null,
+      ttsEnabled: device?.ttsEnabled ?? true,
+      ttsVolume: device?.ttsVolume ?? 80,
       scanners: scanners.map((s) => ({
         id: s.id,
         label: s.label,
         baudRate: s.baudRate,
         usbVendorId: s.usbVendorId,
         usbProductId: s.usbProductId,
+        serialPortPath: s.serialPortPath,
         assignedUsername: s.assignedUsername,
         cctv: s.cctvConfig,
       })),
@@ -191,7 +233,9 @@ export class AgentService {
     });
 
     if (!scanner) {
-      throw new BadRequestException('Scanner tidak ditemukan di workstation ini');
+      throw new BadRequestException(
+        'Scanner tidak ditemukan di workstation ini',
+      );
     }
     if (!scanner.cctvConfig?.isActive) {
       throw new BadRequestException('CCTV scanner tidak aktif');
@@ -207,11 +251,7 @@ export class AgentService {
     );
   }
 
-  async complete(
-    agent: AgentContext,
-    scanId: string,
-    dto: AgentCompleteDto,
-  ) {
+  async complete(agent: AgentContext, scanId: string, dto: AgentCompleteDto) {
     return this.invoiceScan.completeFromAgent(
       scanId,
       agent.workstationId,
@@ -225,7 +265,11 @@ export class AgentService {
 
   async reconcileClips(
     agent: AgentContext,
-    clips: { invoiceNumber: string; localClipPath: string; sizeBytes: number }[],
+    clips: {
+      invoiceNumber: string;
+      localClipPath: string;
+      sizeBytes: number;
+    }[],
   ) {
     return this.invoiceScan.reconcileClipsFromAgent(
       agent.organizationName,
@@ -243,6 +287,14 @@ export class AgentService {
           lastSeenAt: now,
           agentVersion: dto.agentVersion,
           clipsDir: dto.clipsDir,
+          ...(dto.diskFreeBytes != null
+            ? {
+                diskFreeBytes: BigInt(
+                  Math.max(0, Math.floor(dto.diskFreeBytes)),
+                ),
+                diskCheckedAt: now,
+              }
+            : {}),
         },
       }),
       this.prisma.workstation.update({
@@ -261,12 +313,25 @@ export class AgentService {
     );
   }
 
+  async listRecentScans(agent: AgentContext) {
+    return this.invoiceScan.listRecentScansForAgent(
+      agent.organizationName,
+      agent.workstationId,
+    );
+  }
+
   async pairUsb(
     agent: AgentContext,
     scannerId: string,
     usbVendorId: number,
     usbProductId: number,
+    serialPortPath: string,
   ) {
+    const portPath = serialPortPath.trim();
+    if (!portPath) {
+      throw new BadRequestException('serialPortPath wajib diisi');
+    }
+
     const scanner = await this.prisma.scannerConfig.findFirst({
       where: {
         id: scannerId,
@@ -277,14 +342,38 @@ export class AgentService {
     });
 
     if (!scanner) {
-      throw new BadRequestException('Scanner tidak ditemukan di workstation ini');
+      throw new BadRequestException(
+        'Scanner tidak ditemukan di workstation ini',
+      );
+    }
+
+    const conflict = await this.prisma.scannerConfig.findFirst({
+      where: {
+        workstationId: agent.workstationId,
+        organizationName: agent.organizationName,
+        serialPortPath: portPath,
+        id: { not: scannerId },
+        isActive: true,
+      },
+      select: { label: true },
+    });
+    if (conflict) {
+      throw new BadRequestException(
+        `Port ${portPath} sudah dipakai scanner "${conflict.label}"`,
+      );
     }
 
     await this.prisma.scannerConfig.update({
       where: { id: scannerId },
-      data: { usbVendorId, usbProductId },
+      data: { usbVendorId, usbProductId, serialPortPath: portPath },
     });
 
-    return { ok: true, scannerId, usbVendorId, usbProductId };
+    return {
+      ok: true,
+      scannerId,
+      usbVendorId,
+      usbProductId,
+      serialPortPath: portPath,
+    };
   }
 }

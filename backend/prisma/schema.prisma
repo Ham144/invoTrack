@@ -82,6 +82,10 @@ model AgentDevice {
   agentVersion     String?
   lastSeenAt       DateTime?
   clipsDir         String?
+  diskFreeBytes    BigInt?
+  diskCheckedAt    DateTime?
+  ttsEnabled       Boolean      @default(true)
+  ttsVolume        Int          @default(80)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 }
@@ -100,6 +104,7 @@ model ScannerConfig {
   baudRate         Int           @default(9600)
   usbVendorId      Int?
   usbProductId     Int?
+  serialPortPath   String?
   isActive         Boolean       @default(true)
   invoiceScans     InvoiceScan[]
   createdAt        DateTime      @default(now())

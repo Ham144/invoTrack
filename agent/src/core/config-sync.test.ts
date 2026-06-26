@@ -11,12 +11,14 @@ const scanner = (
   usbVendorId: number | null = null,
   usbProductId: number | null = null,
   baudRate = 9600,
+  serialPortPath: string | null = null,
 ): AgentScannerConfig => ({
   id,
   label: id,
   baudRate,
   usbVendorId,
   usbProductId,
+  serialPortPath,
   assignedUsername: null,
   cctv: {
     id: "cctv-1",
@@ -36,6 +38,12 @@ describe("shouldReconnectSerial", () => {
   it("reconnects when USB pairing changes", () => {
     const prev = [scanner("a", 1, 2)];
     const next = [scanner("a", 3, 4)];
+    expect(shouldReconnectSerial(prev, next)).toBe(true);
+  });
+
+  it("reconnects when COM path changes", () => {
+    const prev = [scanner("a", 1, 2, 9600, "COM3")];
+    const next = [scanner("a", 1, 2, 9600, "COM4")];
     expect(shouldReconnectSerial(prev, next)).toBe(true);
   });
 

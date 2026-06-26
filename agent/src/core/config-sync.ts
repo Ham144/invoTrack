@@ -3,11 +3,17 @@ import type { AgentScannerConfig } from "./api-client";
 export function scannerConfigFingerprint(
   scanners: Pick<
     AgentScannerConfig,
-    "id" | "usbVendorId" | "usbProductId" | "baudRate"
+    "id" | "usbVendorId" | "usbProductId" | "baudRate" | "serialPortPath"
   >[],
 ): string {
   return JSON.stringify(
-    scanners.map((s) => [s.id, s.usbVendorId, s.usbProductId, s.baudRate]),
+    scanners.map((s) => [
+      s.id,
+      s.usbVendorId,
+      s.usbProductId,
+      s.baudRate,
+      s.serialPortPath,
+    ]),
   );
 }
 

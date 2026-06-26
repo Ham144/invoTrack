@@ -72,6 +72,10 @@ export interface AgentStatus {
   agentLastSeenAt?: string | null;
   agentVersion?: string | null;
   clipsDir?: string | null;
+  diskFreeBytes?: number | null;
+  diskCheckedAt?: string | null;
+  ttsEnabled?: boolean;
+  ttsVolume?: number;
   pairingExpiresAt?: string | null;
 }
 
@@ -84,6 +88,7 @@ export interface ScannerConfig {
   baudRate: number;
   usbVendorId?: number | null;
   usbProductId?: number | null;
+  serialPortPath?: string | null;
   isActive: boolean;
   workstation?: { id: string; label: string };
   assignedUser?: { username: string; displayName: string } | null;

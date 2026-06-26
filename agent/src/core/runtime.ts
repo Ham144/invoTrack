@@ -1,15 +1,28 @@
 import fs from "fs";
 import path from "path";
-import { AgentApiClient, AgentScannerConfig } from "./api-client";
+import { AgentActiveRecording, AgentApiClient, AgentScannerConfig, AgentRecentScan } from "./api-client";
 import { captureCctvSnapshot } from "./cctv-snapshot";
 import { shouldReconnectSerial } from "./config-sync";
-import { ClipServer } from "./clip-server";
+import { LocalMediaServer } from "./local-media-server";
+import { Go2RtcPreviewManager, GO2RTC_API_BASE } from "./go2rtc-preview";
+import { toPreviewSubstreamUrl } from "./rtsp-url";
 import { AgentConfig, loadConfig, saveConfig } from "./config-store";
+import { MONTHLY_CLIPS_DIR_PATTERN, monthlyClipsSubdir } from "./clip-storage";
 import { listLocalClipFiles, resolveClipPath } from "./local-clips";
+import {
+  formatFreeBytes,
+  getFreeBytesForPath,
+  isDiskLow,
+} from "./disk-space";
 import { LocalRecorder } from "./recorder";
 import { listSerialPorts, ListedSerialPort, SerialManager } from "./serial";
+import {
+  buildRecordingStartMessage,
+  speak,
+  TtsOptions,
+} from "./tts";
 
-export const AGENT_VERSION = "0.1.2";
+export const AGENT_VERSION = "0.1.3";
 
 export interface ScannerLinkStatus {
   id: string;
@@ -20,6 +33,22 @@ export interface ScannerLinkStatus {
   error: string | null;
 }
 
+export interface MonitorCellStatus {
+  cctvId: string;
+  cctvLabel: string;
+  scannerId: string;
+  scannerLabel: string;
+  operatorUsername: string | null;
+  scannerConnected: boolean;
+  state: "idle" | "recording" | "offline";
+  invoiceNumber: string | null;
+  scanId: string | null;
+  remainingSec: number | null;
+  previewSrc: string;
+  go2rtcBaseUrl: string;
+  previewError: string | null;
+}
+
 export interface RuntimeStatus {
   paired: boolean;
   recording: boolean;
@@ -28,6 +57,9 @@ export interface RuntimeStatus {
   busyMessage: string | null;
   clipsDir: string;
   localClipCount: number;
+  diskFreeBytes: number | null;
+  diskLow: boolean;
+  diskFreeLabel: string;
   scanners: ScannerLinkStatus[];
   configSyncedAt: string | null;
 }
@@ -37,17 +69,22 @@ export class AgentRuntime {
   private api: AgentApiClient;
   private recorder = new LocalRecorder();
   private serial = new SerialManager();
-  private clipServer = new ClipServer();
+  private mediaServer = new LocalMediaServer();
+  private go2rtcPreview = new Go2RtcPreviewManager();
   private pollTimer: NodeJS.Timeout | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private configSyncTimer: NodeJS.Timeout | null = null;
+  private monitorActive = false;
   private remoteConfig: Awaited<
     ReturnType<AgentApiClient["fetchConfig"]>
   > | null = null;
-  private ingestLock = false;
+  private ingestLocks = new Set<string>();
   private reconcileLock = false;
   private finishingScans = new Set<string>();
   private cctvGate = new Map<string, Promise<void>>();
+  private lastActiveRecordings: AgentActiveRecording[] = [];
+  private spokenScanIds = new Set<string>();
+  private busyMessageTimer: NodeJS.Timeout | null = null;
   private status: RuntimeStatus = {
     paired: false,
     recording: false,
@@ -56,6 +93,9 @@ export class AgentRuntime {
     busyMessage: null,
     clipsDir: "",
     localClipCount: 0,
+    diskFreeBytes: null,
+    diskLow: false,
+    diskFreeLabel: "—",
     scanners: [],
     configSyncedAt: null,
   };
@@ -68,13 +108,87 @@ export class AgentRuntime {
   }
 
   getStatus(): RuntimeStatus {
-    this.status.localClipCount = listLocalClipFiles(this.config.clipsDir).length;
+    this.status.localClipCount = listLocalClipFiles(
+      this.config.clipsDir,
+    ).length;
+    this.refreshDiskStatus();
     this.updateScannerStatus();
     return { ...this.status };
   }
 
   getConfig(): AgentConfig {
     return { ...this.config };
+  }
+
+  updateTtsSettings(settings: {
+    ttsEnabled?: boolean;
+    ttsVolume?: number;
+  }): AgentConfig {
+    if (settings.ttsEnabled !== undefined) {
+      this.config.ttsEnabled = settings.ttsEnabled;
+    }
+    if (settings.ttsVolume !== undefined) {
+      this.config.ttsVolume = Math.max(0, Math.min(100, settings.ttsVolume));
+    }
+    saveConfig(this.config);
+    return { ...this.config };
+  }
+
+  testTts(): void {
+    this.speakMessage(
+      buildRecordingStartMessage("Budi", "12345678901234567"),
+    );
+  }
+
+  private ttsOptions(): TtsOptions {
+    return {
+      enabled: this.config.ttsEnabled !== false,
+      volume: this.config.ttsVolume ?? 80,
+    };
+  }
+
+  private speakMessage(text: string): void {
+    speak(text, this.ttsOptions());
+  }
+
+  private announceRecordingStart(
+    scanId: string,
+    operatorUsername: string | null | undefined,
+    invoiceNumber: string,
+  ): void {
+    if (this.spokenScanIds.has(scanId)) return;
+    this.spokenScanIds.add(scanId);
+    if (this.spokenScanIds.size > 200) {
+      const first = this.spokenScanIds.values().next().value;
+      if (first) this.spokenScanIds.delete(first);
+    }
+    this.speakMessage(
+      buildRecordingStartMessage(operatorUsername, invoiceNumber),
+    );
+  }
+
+  private refreshDiskStatus(): void {
+    const freeBytes = getFreeBytesForPath(this.config.clipsDir);
+    this.status.diskFreeBytes = freeBytes;
+    this.status.diskLow = isDiskLow(freeBytes);
+    this.status.diskFreeLabel = formatFreeBytes(freeBytes);
+  }
+
+  private setTransientBusyMessage(message: string): void {
+    this.status.busyMessage = message;
+    if (this.busyMessageTimer) clearTimeout(this.busyMessageTimer);
+    this.busyMessageTimer = setTimeout(() => {
+      this.busyMessageTimer = null;
+      if (this.ingestLocks.size === 0) this.status.busyMessage = null;
+    }, 8000);
+  }
+
+  private clearBusyMessage(): void {
+    if (this.busyMessageTimer) {
+      clearTimeout(this.busyMessageTimer);
+      this.busyMessageTimer = null;
+    }
+    this.status.busyMessage = null;
   }
 
   getScanners(): AgentScannerConfig[] {
@@ -89,8 +203,14 @@ export class AgentRuntime {
     scannerId: string,
     usbVendorId: number,
     usbProductId: number,
+    serialPortPath: string,
   ): Promise<void> {
-    await this.api.pairUsb(scannerId, usbVendorId, usbProductId);
+    await this.api.pairUsb(
+      scannerId,
+      usbVendorId,
+      usbProductId,
+      serialPortPath,
+    );
     await this.refreshConfig(true);
   }
 
@@ -109,9 +229,15 @@ export class AgentRuntime {
     if (next.clipsDir) {
       this.config.clipsDir = next.clipsDir;
     }
+    if (next.ttsEnabled !== undefined) {
+      this.config.ttsEnabled = next.ttsEnabled;
+    }
+    if (next.ttsVolume !== undefined) {
+      this.config.ttsVolume = next.ttsVolume;
+    }
     this.status.clipsDir = this.config.clipsDir;
     fs.mkdirSync(this.config.clipsDir, { recursive: true });
-    this.clipServer.start(this.config.clipsDir);
+    this.mediaServer.start(this.config.clipsDir);
     saveConfig(this.config);
 
     if (!next.scanners.length) {
@@ -124,10 +250,177 @@ export class AgentRuntime {
 
     this.status.configSyncedAt = new Date().toISOString();
     this.updateScannerStatus();
+    this.syncMonitorPreviews();
   }
 
   async syncClipsNow(): Promise<void> {
     await this.reconcileLocalClips();
+  }
+
+  getMonitorGrid(): MonitorCellStatus[] {
+    this.updateScannerStatus();
+    const scanners = this.remoteConfig?.scanners ?? [];
+    const linkByScanner = new Map(this.status.scanners.map((s) => [s.id, s]));
+
+    return scanners
+      .filter((s) => s.cctv?.isActive && s.cctv.rtspUrl)
+      .map((s) => {
+        const link = linkByScanner.get(s.id);
+        const recording = this.recorder.isRecordingForCctv(s.cctv.id);
+        const invoice = recording
+          ? this.recorder.getRecordingInvoiceForCctv(s.cctv.id)
+          : null;
+        const scanId = recording
+          ? this.recorder.getRecordingScanIdForCctv(s.cctv.id)
+          : null;
+        const activeRow = this.lastActiveRecordings.find(
+          (r) => r.cctvConfigId === s.cctv.id,
+        );
+        const remainingSec = activeRow?.remainingSec ?? null;
+        const previewError = this.go2rtcPreview.getLastError(s.cctv.id);
+
+        return {
+          cctvId: s.cctv.id,
+          cctvLabel: s.cctv.label,
+          scannerId: s.id,
+          scannerLabel: s.label,
+          operatorUsername: s.assignedUsername,
+          scannerConnected: link?.connected ?? false,
+          state: recording ? "recording" : "idle",
+          invoiceNumber: invoice,
+          scanId,
+          remainingSec,
+          previewSrc: this.go2rtcPreview.streamName(s.cctv.id),
+          go2rtcBaseUrl: GO2RTC_API_BASE,
+          previewError,
+        } satisfies MonitorCellStatus;
+      });
+  }
+
+  getActiveRecordings(): AgentActiveRecording[] {
+    return [...this.lastActiveRecordings];
+  }
+
+  async getRecentScans(): Promise<AgentRecentScan[]> {
+    if (!this.config.deviceToken) return [];
+    return this.api.recentScans();
+  }
+
+  async startMonitor(): Promise<void> {
+    for (const scanner of this.remoteConfig?.scanners ?? []) {
+      if (!scanner.cctv?.isActive || !scanner.cctv.rtspUrl) continue;
+      const rtspUrl = this.buildRtspUrl(
+        scanner.cctv.rtspUrl,
+        scanner.cctv.username,
+        scanner.cctv.password,
+      );
+      this.go2rtcPreview.warmUp(scanner.cctv.id, toPreviewSubstreamUrl(rtspUrl));
+    }
+
+    if (this.monitorActive) {
+      await this.go2rtcPreview.resync();
+      return;
+    }
+
+    this.monitorActive = true;
+    await this.go2rtcPreview.start();
+  }
+
+  async resyncMonitor(): Promise<void> {
+    for (const scanner of this.remoteConfig?.scanners ?? []) {
+      if (!scanner.cctv?.isActive || !scanner.cctv.rtspUrl) continue;
+      const rtspUrl = this.buildRtspUrl(
+        scanner.cctv.rtspUrl,
+        scanner.cctv.username,
+        scanner.cctv.password,
+      );
+      this.go2rtcPreview.warmUp(scanner.cctv.id, toPreviewSubstreamUrl(rtspUrl));
+    }
+    await this.go2rtcPreview.resync();
+  }
+
+  stopMonitor(): void {
+    if (!this.monitorActive) return;
+    this.monitorActive = false;
+    this.go2rtcPreview.stopAll();
+  }
+
+  async startCameraPreview(cctvId: string): Promise<void> {
+    const scanner = this.remoteConfig?.scanners.find(
+      (s) => s.cctv?.id === cctvId,
+    );
+    if (!scanner?.cctv?.rtspUrl) return;
+    const rtspUrl = this.buildRtspUrl(
+      scanner.cctv.rtspUrl,
+      scanner.cctv.username,
+      scanner.cctv.password,
+    );
+    await this.go2rtcPreview.startCamera(
+      cctvId,
+      toPreviewSubstreamUrl(rtspUrl),
+    );
+  }
+
+  async stopCameraPreview(cctvId: string): Promise<void> {
+    await this.go2rtcPreview.stopCamera(cctvId);
+  }
+
+  async refreshPreview(cctvId: string): Promise<void> {
+    const scanner = this.remoteConfig?.scanners.find(
+      (s) => s.cctv?.id === cctvId,
+    );
+    if (!scanner?.cctv?.rtspUrl) return;
+    const rtspUrl = this.buildRtspUrl(
+      scanner.cctv.rtspUrl,
+      scanner.cctv.username,
+      scanner.cctv.password,
+    );
+    await this.go2rtcPreview.refreshStream(
+      cctvId,
+      toPreviewSubstreamUrl(rtspUrl),
+    );
+  }
+
+  async stopRecording(scanId: string): Promise<void> {
+    if (this.finishingScans.has(scanId)) return;
+    this.finishingScans.add(scanId);
+    try {
+      let localPath: string | null = null;
+      if (this.recorder.isRecording(scanId)) {
+        localPath = await this.recorder.stop(scanId);
+      }
+      if (!localPath) {
+        const row = this.lastActiveRecordings.find((r) => r.scanId === scanId);
+        if (row) {
+          localPath = resolveClipPath(this.config.clipsDir, row.invoiceNumber);
+        }
+      }
+      if (localPath) {
+        await this.api.complete(scanId, localPath, 0);
+      } else {
+        await this.api.failRecording(scanId);
+      }
+      this.status.recording = this.recorder.hasActiveRecordings();
+    } finally {
+      this.finishingScans.delete(scanId);
+    }
+  }
+
+  private syncMonitorPreviews(): void {
+    if (!this.monitorActive) return;
+    for (const scanner of this.remoteConfig?.scanners ?? []) {
+      if (!scanner.cctv?.isActive || !scanner.cctv.rtspUrl) continue;
+      const rtspUrl = this.buildRtspUrl(
+        scanner.cctv.rtspUrl,
+        scanner.cctv.username,
+        scanner.cctv.password,
+      );
+      this.go2rtcPreview.warmUp(
+        scanner.cctv.id,
+        toPreviewSubstreamUrl(rtspUrl),
+      );
+    }
+    void this.go2rtcPreview.resync().catch(() => {});
   }
 
   private updateScannerStatus(): void {
@@ -228,13 +521,15 @@ export class AgentRuntime {
   ): Promise<void> {
     if (!this.remoteConfig) return;
 
-    if (this.ingestLock) {
-      this.status.busyMessage = `Sedang merekam — scan "${invoiceNumber}" diabaikan, tunggu selesai`;
+    if (this.ingestLocks.has(scannerConfigId)) {
+      this.setTransientBusyMessage(
+        `Scanner sibuk — scan "${invoiceNumber}" diabaikan, tunggu selesai`,
+      );
       return;
     }
 
-    this.ingestLock = true;
-    this.status.busyMessage = null;
+    this.ingestLocks.add(scannerConfigId);
+    this.clearBusyMessage();
     let scanId: string | null = null;
     try {
       const scan = await this.api.ingest(scannerConfigId, invoiceNumber);
@@ -247,6 +542,12 @@ export class AgentRuntime {
       if (!scanner?.cctv?.rtspUrl) {
         throw new Error("RTSP CCTV tidak dikonfigurasi");
       }
+
+      this.announceRecordingStart(
+        scan.id,
+        scanner.assignedUsername,
+        scan.invoiceNumber,
+      );
 
       const rtspUrl = this.buildRtspUrl(
         scanner.cctv.rtspUrl,
@@ -274,10 +575,12 @@ export class AgentRuntime {
           /* ignore */
         }
       }
-      this.status.lastError =
-        err instanceof Error ? err.message : "Scan gagal";
+      this.status.lastError = err instanceof Error ? err.message : "Scan gagal";
     } finally {
-      this.ingestLock = false;
+      this.ingestLocks.delete(scannerConfigId);
+      if (!this.status.recording && this.ingestLocks.size === 0) {
+        this.clearBusyMessage();
+      }
     }
   }
 
@@ -333,6 +636,7 @@ export class AgentRuntime {
 
     try {
       const rows = await this.api.activeRecordings();
+      this.lastActiveRecordings = rows;
 
       for (const row of rows) {
         const shouldStop = row.stopRequested || row.remainingSec <= 0;
@@ -346,6 +650,14 @@ export class AgentRuntime {
           );
           try {
             const cctvId = row.cctvConfigId || "unknown";
+            const scanner = this.remoteConfig?.scanners.find(
+              (s) => s.cctv?.id === cctvId,
+            );
+            this.announceRecordingStart(
+              row.scanId,
+              scanner?.assignedUsername ?? null,
+              row.invoiceNumber,
+            );
             await this.withCctvLock(cctvId, () =>
               this.recorder.start({
                 scanId: row.scanId,
@@ -367,9 +679,11 @@ export class AgentRuntime {
       }
 
       this.status.recording = this.recorder.hasActiveRecordings();
+      if (!this.status.recording && this.ingestLocks.size === 0) {
+        this.clearBusyMessage();
+      }
     } catch (err) {
-      this.status.lastError =
-        err instanceof Error ? err.message : "Poll gagal";
+      this.status.lastError = err instanceof Error ? err.message : "Poll gagal";
     }
   }
 
@@ -383,15 +697,17 @@ export class AgentRuntime {
     }
 
     fs.mkdirSync(this.config.clipsDir, { recursive: true });
-    this.clipServer.start(this.config.clipsDir);
+    this.mediaServer.start(this.config.clipsDir);
     await this.syncRemote();
     await this.reconcileLocalClips();
 
     const heartbeat = async () => {
       try {
+        this.refreshDiskStatus();
         await this.api.heartbeat({
           agentVersion: AGENT_VERSION,
           clipsDir: this.config.clipsDir,
+          diskFreeBytes: this.status.diskFreeBytes ?? undefined,
           isRecording: this.status.recording,
         });
         await this.reconcileLocalClips();
@@ -414,7 +730,9 @@ export class AgentRuntime {
     if (this.pollTimer) clearInterval(this.pollTimer);
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     if (this.configSyncTimer) clearInterval(this.configSyncTimer);
-    this.clipServer.stop();
+    this.monitorActive = false;
+    this.go2rtcPreview.stopAll();
+    this.mediaServer.stop();
     await this.serial.disconnectAll();
   }
 
@@ -422,12 +740,32 @@ export class AgentRuntime {
     const dir = this.config.clipsDir;
     if (!fs.existsSync(dir)) return;
     const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
-    for (const name of fs.readdirSync(dir)) {
-      if (!name.endsWith(".mp4")) continue;
-      const filePath = path.join(dir, name);
+
+    const purgeMp4InDir = (targetDir: string) => {
+      if (!fs.existsSync(targetDir)) return;
+      for (const name of fs.readdirSync(targetDir)) {
+        if (!name.toLowerCase().endsWith(".mp4")) continue;
+        const filePath = path.join(targetDir, name);
+        try {
+          const stat = fs.statSync(filePath);
+          if (stat.mtimeMs < cutoff) fs.unlinkSync(filePath);
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+
+    purgeMp4InDir(dir);
+
+    for (const name of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!name.isDirectory() || !MONTHLY_CLIPS_DIR_PATTERN.test(name.name)) {
+        continue;
+      }
+      const monthDir = path.join(dir, name.name);
+      purgeMp4InDir(monthDir);
       try {
-        const stat = fs.statSync(filePath);
-        if (stat.mtimeMs < cutoff) fs.unlinkSync(filePath);
+        const remaining = fs.readdirSync(monthDir);
+        if (remaining.length === 0) fs.rmdirSync(monthDir);
       } catch {
         /* ignore */
       }

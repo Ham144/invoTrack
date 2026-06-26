@@ -16,6 +16,7 @@ import {
   CreateWorkstationDto,
   UpdateWorkstationDto,
 } from './dto/workstation.dto';
+import { UpdateAgentSettingsDto } from './agent/dto/agent.dto';
 
 @Controller('workstation')
 export class WorkstationController {
@@ -68,5 +69,15 @@ export class WorkstationController {
   @Get(':id/agent/status')
   agentStatus(@Param('id') id: string, @Auth() userInfo: TokenPayload) {
     return this.agentService.getAgentStatus(id, userInfo);
+  }
+
+  @Authorization('ADMIN_ORGANIZATION')
+  @Patch(':id/agent/settings')
+  updateAgentSettings(
+    @Param('id') id: string,
+    @Auth() userInfo: TokenPayload,
+    @Body() dto: UpdateAgentSettingsDto,
+  ) {
+    return this.agentService.updateAgentSettings(id, userInfo, dto);
   }
 }

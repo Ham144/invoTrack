@@ -26,6 +26,11 @@ describe("parseScanLines", () => {
   it("handles multiple lines in one chunk", () => {
     expect(parseScanLines("AAA\r\nBBB\r\n")).toEqual(["AAA", "BBB"]);
   });
+
+  it("ignores scanner device-name prefix DN:", () => {
+    expect(parseScanLines("DN:TM-T82\r\n")).toEqual([]);
+    expect(parseScanLines("DN:TM-T82\r\nINV001\r\n")).toEqual(["INV001"]);
+  });
 });
 
 describe("parseUsbId", () => {

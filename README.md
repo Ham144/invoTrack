@@ -5,18 +5,20 @@ Sistem manajemen logistik IoT multi-tenant: pemindaian invoice + auto-record CCT
 ## Struktur
 
 - `backend/` — NestJS API, Prisma, FFmpeg autocut, Socket.IO
-- `frontend/` — Astro + React islands (TanStack Query, Zustand, DaisyUI)
-- `old frontend/` — arsip Next.js (Orbit), referensi saja
+- `frontend/` — Astro + React islands (TanStack Query, Zustand, DaisyUI) — dashboard admin
+- `agent/` — Electron desktop di PC kasir (USB serial VCOM, FFmpeg rekam, sync clip)
 
 ## Arsitektur scan
 
 ```
-Workstation (PC kasir) → ScannerConfig (USB serial) → Operator + CCTV
+Workstation (PC kasir) → BuktiScan Agent → N× ScannerConfig (USB serial COM) → Operator + CCTV
 ```
 
-- Login JWT hanya untuk akses UI
+- **Web** = konfigurasi admin (workstation, scanner, CCTV, TTS, log scan)
+- **Agent** = runtime edge di PC kasir: baca barcode dari port COM, rekam RTSP, upload klip
+- Login JWT hanya untuk akses UI web
 - Ingest scan memakai `scannerConfigId`, bukan user yang sedang login
-- Web Serial API (Chrome/Edge) membaca barcode dari port COM scanner Panda
+- Scanner harus mode **USB VCOM/serial** (bukan HID keyboard) agar tiap meja punya port COM sendiri — mendukung hingga **6 scanner + 6 CCTV paralel** per workstation (plan PRO)
 
 ## Menjalankan
 
@@ -41,15 +43,25 @@ pnpm install
 pnpm dev   # bind 0.0.0.0:4321 — buka http://IP-server:4321 di browser
 ```
 
-Login lewat proxy `/api` → backend. Halaman scan butuh **Chrome atau Edge** untuk Web Serial.
+Login lewat proxy `/api` → backend.
+
+### Agent (PC kasir)
+
+```bash
+cd agent
+pnpm install
+pnpm dev          # development
+pnpm dist:win     # build installer Windows
+```
 
 ## Setup scanner di kasir
 
-1. Admin buat **Workstation** + **ScannerConfig** di Perangkat → tab Workstation & Scanner
+1. Admin buat **Workstation** + **ScannerConfig** di web → Perangkat → Workstation & Scanner
 2. Assign operator + CCTV per scanner (1:1:1)
-3. Klik **Pair USB** untuk simpan Vendor/Product ID scanner
-4. Di PC kasir: buka halaman Scan, pilih workstation, **Hubungkan USB** per scanner
-5. Scan barcode → otomatis ingest ke CCTV operator yang di-assign
+3. Install **BuktiScan Agent** di PC kasir, pairing workstation
+4. Di agent tab **Scanner**: pair tiap scanner — pilih **port COM** (tersimpan per scanner, termasuk 6 unit model sama)
+5. Scan barcode → agent ingest + rekam CCTV operator yang di-assign
+6. Preview live (Monitor/Kamera) opsional — matikan saat operasional penuh untuk hemat resource PC
 
 ## API utama
 
@@ -60,5 +72,6 @@ Login lewat proxy `/api` → backend. Halaman scan butuh **Chrome atau Edge** un
 | `GET/POST /api/scanner-config`          | CRUD scanner + assign operator/CCTV |
 | `POST /api/invoice-scan/ingest/scanner` | Scan via `scannerConfigId`          |
 | `GET/POST /api/cctv-config`             | Pengaturan RTSP                     |
+| `POST /api/agent/scanner/:id/pair-usb`  | Pair COM + VID/PID dari agent       |
 
 WebSocket: `join_org` → event `scan-log-update`, `device-status-update`

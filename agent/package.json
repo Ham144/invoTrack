@@ -1,6 +1,6 @@
 {
   "name": "BuktiScan-agent",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "BuktiScan desktop agent — scan, record RTSP, save clips locally",
   "packageManager": "pnpm@10.19.0",
@@ -21,7 +21,8 @@
     "dev:cli": "tsx watch src/cli.ts",
     "dev:electron": "pnpm build:core && electron .",
     "ensure:ffmpeg:win": "node scripts/ensure-ffmpeg-win.mjs",
-    "dist:win": "pnpm ensure:ffmpeg:win && pnpm build && electron-builder --win",
+    "ensure:go2rtc:win": "node scripts/ensure-go2rtc-win.mjs",
+    "dist:win": "pnpm ensure:ffmpeg:win && pnpm ensure:go2rtc:win && pnpm build && electron-builder --win",
     "dist:win:web": "pnpm dist:win && cp release/BuktiScanAgent-portable.zip ../frontend/public/downloads/",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -61,12 +62,20 @@
       {
         "from": "node_modules/ffmpeg-static/ffmpeg.exe",
         "to": "ffmpeg.exe"
+      },
+      {
+        "from": "node_modules/go2rtc-static/go2rtc.exe",
+        "to": "go2rtc.exe"
       }
     ],
     "extraFiles": [
       {
         "from": "node_modules/ffmpeg-static/ffmpeg.exe",
         "to": "ffmpeg.exe"
+      },
+      {
+        "from": "node_modules/go2rtc-static/go2rtc.exe",
+        "to": "go2rtc.exe"
       },
       {
         "from": ".env.production",

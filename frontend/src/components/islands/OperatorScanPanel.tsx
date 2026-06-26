@@ -268,6 +268,19 @@ export default function OperatorScanPanel() {
                   {status.clipsDir ?? "—"}
                 </dd>
               </div>
+              {status.diskFreeBytes != null && (
+                <div>
+                  <dt className="text-base-content/50">Ruang disk agent</dt>
+                  <dd>
+                    {(status.diskFreeBytes / 1024 ** 3).toFixed(1)} GB
+                    {status.diskFreeBytes < 5 * 1024 ** 3 && (
+                      <span className="badge badge-sm badge-error ml-2">
+                        Rendah
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              )}
             </dl>
           ) : null}
         </div>

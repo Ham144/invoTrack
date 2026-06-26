@@ -1,6 +1,7 @@
 import { spawn, ChildProcess } from "child_process";
 import fs from "fs";
 import path from "path";
+import { buildLocalClipPath, buildMonthlyClipDir } from "./clip-storage";
 import { ffmpegRtspInputArgs, resolveFfmpegBin } from "./ffmpeg-bin";
 
 /** Wait up to 15s for first RTSP data — Hikvision often needs >2s after reconnect. */
@@ -296,6 +297,27 @@ export class LocalRecorder {
     return this.finalizeSession(session);
   }
 
+  isRecordingForCctv(cctvConfigId: string): boolean {
+    const prefix = `${cctvConfigId}:`;
+    return [...this.sessions.keys()].some((k) => k.startsWith(prefix));
+  }
+
+  getRecordingInvoiceForCctv(cctvConfigId: string): string | null {
+    const prefix = `${cctvConfigId}:`;
+    const session = [...this.sessions.values()].find((s) =>
+      s.key.startsWith(prefix),
+    );
+    return session?.invoiceNumber ?? null;
+  }
+
+  getRecordingScanIdForCctv(cctvConfigId: string): string | null {
+    const prefix = `${cctvConfigId}:`;
+    const session = [...this.sessions.values()].find((s) =>
+      s.key.startsWith(prefix),
+    );
+    return session?.scanId ?? null;
+  }
+
   isRecording(scanId: string): boolean {
     return [...this.sessions.values()].some((s) => s.scanId === scanId);
   }
@@ -317,10 +339,11 @@ export class LocalRecorder {
     await this.stopForCctv(params.cctvConfigId);
     await new Promise((r) => setTimeout(r, POST_CCTV_STOP_MS));
 
-    fs.mkdirSync(params.clipsDir, { recursive: true });
-    const outputPath = path.join(
+    const monthlyDir = buildMonthlyClipDir(params.clipsDir);
+    fs.mkdirSync(monthlyDir, { recursive: true });
+    const outputPath = buildLocalClipPath(
       params.clipsDir,
-      `${safeInvoiceName(params.invoiceNumber)}.mp4`,
+      params.invoiceNumber,
     );
     const partsDir = this.getPartsDir(params.clipsDir, params.invoiceNumber);
     this.cleanupParts(partsDir);

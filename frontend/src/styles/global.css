@@ -5,3 +5,58 @@
 :root {
   font-family: system-ui, sans-serif;
 }
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.35s ease-out;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thumb-base-300::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thumb-base-300::-webkit-scrollbar-thumb {
+  background-color: oklch(var(--b3));
+  border-radius: 9999px;
+}
+
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@layer components {
+  .page-hero {
+    @apply bg-gradient-to-br from-primary via-primary to-primary rounded-2xl shadow-lg overflow-hidden text-primary-content;
+  }
+
+  .surface-card {
+    @apply bg-base-100 rounded-2xl shadow-sm border border-base-300 overflow-hidden;
+  }
+}

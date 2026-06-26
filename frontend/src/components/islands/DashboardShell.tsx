@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useSessionStore } from "@/stores/sessionStore";
 import { ROLE } from "@/types/auth";
+import { ROLE_LABELS } from "@/lib/permissions";
 
 type NavItem = {
   href: string;
@@ -72,12 +73,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   },
 ];
 
-const ROLE_LABELS: Record<string, string> = {
-  ADMIN_ORGANIZATION: "Admin Org",
-  ADMIN_GUDANG: "Admin Gudang",
-  OPERATOR: "Operator",
-  SUPERTENANT: "Supertenant",
-};
+const ROLE_LABELS_MAP: Record<string, string> = ROLE_LABELS;
 
 export default function DashboardShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -114,7 +110,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
         <div className="p-5 border-b border-base-300/50 flex items-center justify-between bg-gradient-to-r from-primary/5 to-transparent">
           <a href="/dashboard" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-focus flex items-center justify-center text-primary-content font-bold text-sm shadow-lg shadow-primary/25 transition-transform duration-300 group-hover:scale-105">
-              IT
+              BS
             </div>
             <span className="font-bold text-lg bg-gradient-to-r from-base-content to-base-content/70 bg-clip-text text-transparent">
               BuktiScan
@@ -192,7 +188,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
                 </p>
                 {user?.role && (
                   <span className="badge badge-sm badge-primary badge-outline mt-1 px-3 py-1 border-2 font-medium">
-                    {ROLE_LABELS[user.role] ?? user.role}
+                    {ROLE_LABELS_MAP[user.role] ?? user.role}
                   </span>
                 )}
               </div>

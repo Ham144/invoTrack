@@ -2,6 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, describe, expect, it } from "vitest";
+import { monthlyClipsSubdir } from "./clip-storage";
 import { listLocalClipFiles, resolveClipPath } from "./local-clips";
 import { safeInvoiceName } from "./recorder";
 
@@ -19,6 +20,18 @@ describe("listLocalClipFiles", () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
     dirs.length = 0;
+  });
+
+  it("lists mp4 files in monthly subfolder", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "BuktiScan-clips-"));
+    dirs.push(dir);
+    const monthDir = path.join(dir, monthlyClipsSubdir());
+    fs.mkdirSync(monthDir, { recursive: true });
+    fs.writeFileSync(path.join(monthDir, "INV002.mp4"), Buffer.alloc(100_000));
+
+    const clips = listLocalClipFiles(dir);
+    expect(clips).toHaveLength(1);
+    expect(clips[0].invoiceNumber).toBe("INV002");
   });
 
   it("lists mp4 files in clips dir", () => {
@@ -45,6 +58,17 @@ describe("resolveClipPath", () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
     dirs.length = 0;
+  });
+
+  it("resolves clip in monthly subfolder", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "BuktiScan-resolve-month-"));
+    dirs.push(dir);
+    const monthDir = path.join(dir, monthlyClipsSubdir());
+    fs.mkdirSync(monthDir, { recursive: true });
+    const filePath = path.join(monthDir, "INV002.mp4");
+    fs.writeFileSync(filePath, Buffer.alloc(70_000));
+
+    expect(resolveClipPath(dir, "INV002")).toBe(filePath);
   });
 
   it("returns path when file large enough", () => {

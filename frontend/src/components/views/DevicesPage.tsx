@@ -14,6 +14,8 @@ import RecordingSettingsPanel from "@/components/islands/RecordingSettingsPanel"
 import StatCard from "@/components/ui/StatCard";
 import { useQuery } from "@tanstack/react-query";
 import { BuktiScanApi } from "@/api/invo-track";
+import { canManageInfrastructure } from "@/lib/permissions";
+import { useSessionStore } from "@/stores/sessionStore";
 import type { DeviceStatus, SubscriptionQuota } from "@/types/invo-track";
 
 type Tab = "config" | "scanners" | "recording";
@@ -28,6 +30,8 @@ export default function DevicesPage() {
 
 function DevicesPageContent() {
   const [tab, setTab] = useState<Tab>("config");
+  const user = useSessionStore((s) => s.user);
+  const canEdit = canManageInfrastructure(user?.role);
 
   const { data: devices, isLoading: devicesLoading } = useQuery({
     queryKey: ["device-status"],
@@ -77,10 +81,8 @@ function DevicesPageContent() {
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/75 shadow-lg">
-        <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-primary-content/10 blur-2xl" />
-        <div className="absolute -bottom-12 -left-6 h-32 w-32 rounded-full bg-primary-content/5 blur-xl" />
-        <div className="relative px-6 py-8 md:px-8 md:py-10">
+      <section className="page-hero">
+        <div className="px-6 py-8 md:px-8 md:py-10">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
               <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -118,6 +120,13 @@ function DevicesPageContent() {
           </div>
         </div>
       </section>
+
+      {!canEdit && (
+        <div className="alert alert-warning text-sm py-3">
+          Mode baca saja — perubahan perangkat membutuhkan peran Admin
+          Organisasi.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5">
         <StatCard

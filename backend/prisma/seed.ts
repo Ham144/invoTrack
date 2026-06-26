@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { InvoiceScanStatus, ROLE } from '../src/common/shared-enum';
+import { buildLocalClipPath } from '../src/invo-track/agent/clip-storage';
 
 const ORG_NAME =
   process.env.DEFAULT_ORGANIZATION_NAME || 'Catur Sukses Internasional';
@@ -195,7 +196,7 @@ async function init() {
     const safeName = item.num.replace(/[^a-zA-Z0-9_-]/g, '_');
     const localClipPath =
       item.status === InvoiceScanStatus.COMPLETED
-        ? `D:\\BuktiScan\\clips\\${safeName}.mp4`
+        ? buildLocalClipPath('D:\\BuktiScan\\clips', item.num, scannedAt)
         : null;
 
     const completedAt =

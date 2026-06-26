@@ -1,11 +1,13 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -75,6 +77,10 @@ export class AgentPairUsbDto {
   @IsInt()
   @Min(0)
   usbProductId: number;
+
+  @IsString()
+  @IsNotEmpty()
+  serialPortPath: string;
 }
 
 export class AgentHeartbeatDto {
@@ -91,4 +97,20 @@ export class AgentHeartbeatDto {
 
   @IsOptional()
   isRecording?: boolean;
+}
+
+export class UpdateAgentSettingsDto {
+  @IsBoolean()
+  @IsOptional()
+  ttsEnabled?: boolean;
+
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  ttsVolume?: number;
+
+  @IsString()
+  @IsOptional()
+  clipsDir?: string;
 }

@@ -1,9 +1,18 @@
+/** Prefix barcode konfigurasi scanner (bukan invoice). */
+const SCANNER_NOISE_PREFIXES = [/^DN:/i, /^DEVICE:/i, /^NUL/i];
+
+function isScannerNoiseLine(line: string): boolean {
+  return SCANNER_NOISE_PREFIXES.some((re) => re.test(line));
+}
+
 /** Parse barcode lines from serial chunk (handles \\r, \\n, \\r\\n). */
 export function parseScanLines(chunk: string): string[] {
   const invoices: string[] = [];
   for (const line of chunk.split(/[\r\n]+/)) {
     const invoice = line.trim().toUpperCase();
-    if (invoice.length >= 3) invoices.push(invoice);
+    if (invoice.length < 3) continue;
+    if (isScannerNoiseLine(invoice)) continue;
+    invoices.push(invoice);
   }
   return invoices;
 }

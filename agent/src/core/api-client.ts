@@ -25,6 +25,7 @@ export interface AgentScannerConfig {
   baudRate: number;
   usbVendorId: number | null;
   usbProductId: number | null;
+  serialPortPath: string | null;
   assignedUsername: string | null;
   cctv: {
     id: string;
@@ -41,6 +42,8 @@ export interface AgentRemoteConfig {
   workstationId: string;
   recordingMaxDurationSec: number;
   clipsDir: string | null;
+  ttsEnabled?: boolean;
+  ttsVolume?: number;
   scanners: AgentScannerConfig[];
 }
 
@@ -56,6 +59,15 @@ export interface AgentActiveRecording {
   rtspUrl: string | null;
   cctvUsername: string | null;
   cctvPassword: string | null;
+}
+
+export interface AgentRecentScan {
+  scanId: string;
+  invoiceNumber: string;
+  status: string;
+  scannedAt: string;
+  completedAt: string | null;
+  operatorUsername: string | null;
 }
 
 export interface PairResult {
@@ -152,14 +164,23 @@ export class AgentApiClient {
     return res.data;
   }
 
+  async recentScans(): Promise<AgentRecentScan[]> {
+    const res = await this.http.get<AgentRecentScan[]>(
+      "/api/agent/recent-scans",
+      { headers: this.authHeaders() },
+    );
+    return res.data;
+  }
+
   async pairUsb(
     scannerConfigId: string,
     usbVendorId: number,
     usbProductId: number,
+    serialPortPath: string,
   ) {
     const res = await this.http.post(
       `/api/agent/scanner/${scannerConfigId}/pair-usb`,
-      { usbVendorId, usbProductId },
+      { usbVendorId, usbProductId, serialPortPath },
       { headers: this.authHeaders() },
     );
     return res.data;

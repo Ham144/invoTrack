@@ -16,6 +16,8 @@ export interface AgentConfig {
   organizationName?: string;
   workstationLabel?: string;
   clipsDir: string;
+  ttsEnabled?: boolean;
+  ttsVolume?: number;
 }
 
 const CONFIG_DIR = path.join(
@@ -48,6 +50,11 @@ export function loadConfig(): AgentConfig {
         workstationId: raw.workstationId,
         organizationName: raw.organizationName,
         workstationLabel: raw.workstationLabel,
+        ttsEnabled: raw.ttsEnabled !== false,
+        ttsVolume:
+          typeof raw.ttsVolume === "number"
+            ? Math.max(0, Math.min(100, raw.ttsVolume))
+            : 80,
       };
     }
   } catch {
@@ -56,6 +63,8 @@ export function loadConfig(): AgentConfig {
   return {
     apiBaseUrl: DEFAULT_API,
     clipsDir: defaultClipsDir(),
+    ttsEnabled: true,
+    ttsVolume: 80,
   };
 }
 

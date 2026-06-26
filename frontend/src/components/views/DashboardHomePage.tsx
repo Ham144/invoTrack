@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Camera, ClipboardList, Radio, type LucideIcon } from "lucide-react";
 import DashboardFrame from "@/components/islands/DashboardFrame";
+import ActiveRecordingsPanel from "@/components/islands/ActiveRecordingsPanel";
 import DeviceStatusPanel from "@/components/islands/DeviceStatusPanel";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { BuktiScanApi } from "@/api/invo-track";
@@ -64,7 +65,7 @@ function DashboardHomeContent() {
 
   return (
     <div className="space-y-8">
-      <div className="bg-gradient-to-r from-primary to-primary/80 rounded-2xl shadow-lg overflow-hidden">
+      <div className="page-hero">
         <div className="px-6 py-8 md:px-8 md:py-10">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
@@ -107,7 +108,21 @@ function DashboardHomeContent() {
         />
       </div>
 
-      <section className="bg-base-100 rounded-2xl shadow-sm border border-base-300 overflow-hidden">
+      {active.length > 0 && (
+        <section className="surface-card">
+          <div className="px-6 py-5 border-b border-base-300">
+            <h2 className="text-lg font-bold">Rekam Aktif</h2>
+            <p className="text-sm text-base-content/60 mt-1">
+              Invoice yang sedang direkam sekarang
+            </p>
+          </div>
+          <div className="px-6 py-4">
+            <ActiveRecordingsPanel />
+          </div>
+        </section>
+      )}
+
+      <section className="surface-card">
         <div className="px-6 py-5 border-b border-base-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h2 className="text-lg md:text-xl font-bold">Scan Terbaru</h2>
@@ -173,7 +188,7 @@ function DashboardHomeContent() {
         </div>
       </section>
 
-      <section className="bg-base-100 rounded-2xl shadow-sm border border-base-300 overflow-hidden">
+      <section className="surface-card">
         <div className="px-6 py-5 border-b border-base-300">
           <h2 className="text-lg md:text-xl font-bold">Status Perangkat</h2>
           <p className="text-sm text-base-content/60 mt-1">
