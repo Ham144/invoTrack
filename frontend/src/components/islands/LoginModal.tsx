@@ -1,16 +1,9 @@
 import { useState } from "react";
-import axios from "axios";
 import { AuthApi } from "@/api/auth";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { useSessionStore } from "@/stores/sessionStore";
-
-function getErrorMessage(err: unknown): string {
-  if (axios.isAxiosError(err)) {
-    const data = err.response?.data as { message?: string | string[] };
-    if (Array.isArray(data?.message)) return data.message.join(", ");
-    if (typeof data?.message === "string") return data.message;
-  }
-  return "Login gagal, terjadi kesalahan.";
-}
+import { APP_NAME } from "@/lib/constants";
+import { LogIn } from "lucide-react";
 
 export default function LoginModal({
   open,
@@ -34,7 +27,7 @@ export default function LoginModal({
       setUser(res.data);
       window.location.href = "/dashboard";
     } catch (err) {
-      setError(getErrorMessage(err));
+      setError(getApiErrorMessage(err, "Login gagal, terjadi kesalahan."));
     } finally {
       setLoading(false);
     }
@@ -42,42 +35,34 @@ export default function LoginModal({
 
   return (
     <dialog className={`modal ${open ? "modal-open" : ""}`}>
-      <div className="modal-box max-w-md p-0 overflow-hidden border border-base-300">
-        <div className="bg-gradient-to-br from-primary to-primary/80 px-6 py-6 text-primary-content">
+      <div className="modal-box max-w-md p-0 border border-base-300 shadow-panel">
+        <div className="px-6 pt-6 pb-4 border-b border-base-300">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary-content/15 flex items-center justify-center font-bold text-sm">
-              BS
-            </div>
+            <img src="/favicon.png" alt="" className="w-10 h-10 rounded-lg" />
             <div>
-              <h3 className="font-bold text-lg">Masuk BuktiScan</h3>
-              <p className="text-sm text-primary-content/80">
-                Dashboard organisasi Anda
-              </p>
+              <h3 className="font-semibold text-lg">{APP_NAME}</h3>
+              <p className="text-sm muted">Masuk ke dashboard</p>
             </div>
           </div>
         </div>
 
         <form className="px-6 py-5 flex flex-col gap-4" onSubmit={handleLogin}>
-          <div className="form-control w-full">
-            <label className="label py-1">
-              <span className="label-text font-medium">Username</span>
-            </label>
+          <label className="form-control w-full gap-1.5">
+            <span className="text-sm font-medium">Username</span>
             <input
-              className="input input-bordered w-full"
+              className="input-field w-full"
               placeholder="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
               required
             />
-          </div>
+          </label>
 
-          <div className="form-control w-full">
-            <label className="label py-1">
-              <span className="label-text font-medium">Password</span>
-            </label>
+          <label className="form-control w-full gap-1.5">
+            <span className="text-sm font-medium">Password</span>
             <input
-              className="input input-bordered w-full"
+              className="input-field w-full"
               type="password"
               placeholder="••••••••"
               value={password}
@@ -85,32 +70,29 @@ export default function LoginModal({
               autoComplete="current-password"
               required
             />
-          </div>
+          </label>
 
           {error && (
-            <div className="alert alert-error py-2 text-sm">
-              <span>{error}</span>
+            <div className="rounded-lg border border-error/30 bg-error/5 px-3 py-2 text-sm text-error">
+              {error}
             </div>
           )}
 
           <button
             type="submit"
-            className="btn btn-primary w-full mt-1"
+            className="btn btn-primary w-full mt-1 gap-2 border p-2 rounded-lg bg-primary text-white"
             disabled={loading}
           >
             {loading ? (
-              <>
-                <span className="loading loading-spinner loading-sm" />
-                Memproses…
-              </>
+              <span className="loading loading-spinner loading-sm" />
             ) : (
-              "Login"
+              <LogIn className="w-4 h-4" />
             )}
+            Masuk
           </button>
         </form>
       </div>
-
-      <form method="dialog" className="modal-backdrop bg-black/50">
+      <form method="dialog" className="modal-backdrop bg-slate-900/50">
         <button type="button" onClick={onClose}>
           tutup
         </button>

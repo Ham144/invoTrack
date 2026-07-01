@@ -9,14 +9,20 @@ const { title = 'BuktiScan CSI' } = Astro.props;
 ---
 
 <!doctype html>
-<html lang="id" data-theme="corporate">
+<html lang="id" data-theme="bukti">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <title>{title}</title>
   </head>
-  <body class="min-h-screen bg-base-200">
+  <body class="min-h-screen font-sans">
     <slot />
   </body>
 </html>

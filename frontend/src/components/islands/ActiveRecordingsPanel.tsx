@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Radio, Square } from "lucide-react";
 import { toast } from "sonner";
+import { toastApiError } from "@/lib/api-error";
 import { BuktiScanApi } from "@/api/invo-track";
 import type { ActiveRecording } from "@/types/invo-track";
 
@@ -32,7 +33,7 @@ export default function ActiveRecordingsPanel() {
       qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
       toast.success("Rekam dihentikan");
     },
-    onError: () => toast.error("Gagal menghentikan rekam"),
+    onError: (err) => toastApiError(err, "Gagal menghentikan rekam"),
     onSettled: () => setStoppingId(null),
   });
 

@@ -15,14 +15,10 @@ export default function DataTable({
   emptyDescription?: string;
 }) {
   if (loading) {
-    return <div className="skeleton h-48 w-full rounded-xl" />;
+    return <div className="skeleton h-48 w-full rounded-lg" />;
   }
   if (empty) {
     return <EmptyState title={emptyTitle} description={emptyDescription} />;
   }
-  return (
-    <div className="overflow-x-auto rounded-xl border border-base-300 bg-base-100">
-      {children}
-    </div>
-  );
+  return <div className="overflow-x-auto">{children}</div>;
 }

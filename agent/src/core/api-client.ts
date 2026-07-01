@@ -178,12 +178,16 @@ export class AgentApiClient {
     usbProductId: number,
     serialPortPath: string,
   ) {
-    const res = await this.http.post(
-      `/api/agent/scanner/${scannerConfigId}/pair-usb`,
-      { usbVendorId, usbProductId, serialPortPath },
-      { headers: this.authHeaders() },
-    );
-    return res.data;
+    try {
+      const res = await this.http.post(
+        `/api/agent/scanner/${scannerConfigId}/pair-usb`,
+        { usbVendorId, usbProductId, serialPortPath },
+        { headers: this.authHeaders() },
+      );
+      return res.data;
+    } catch (err) {
+      throw formatApiError(err, "Pair USB gagal");
+    }
   }
 
   async failRecording(scanId: string) {

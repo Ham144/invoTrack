@@ -1,6 +1,6 @@
 import DashboardFrame from "@/components/islands/DashboardFrame";
-import MembersPanel from "@/components/islands/MembersPanel";
 import PageHeader from "@/components/ui/PageHeader";
+import MemberManagementTable from "@/components/islands/MemberManagementTable.tsx";
 
 export default function MembersAdminPage() {
   return (
@@ -9,7 +9,7 @@ export default function MembersAdminPage() {
         title="Anggota"
         subtitle="Kelola akun operator, assign CCTV, dan hak akses organisasi."
       />
-      <MembersPanel />
+      <MemberManagementTable />
     </DashboardFrame>
   );
 }

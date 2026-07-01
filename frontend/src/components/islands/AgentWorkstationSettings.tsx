@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Volume2 } from "lucide-react";
 import { toast } from "sonner";
+import { toastApiError } from "@/lib/api-error";
 import { BuktiScanApi } from "@/api/invo-track";
 import type { AgentStatus } from "@/types/invo-track";
 
@@ -35,22 +36,24 @@ export default function AgentWorkstationSettings({
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["agent-status", workstationId] });
-      toast.success("Pengaturan agent disimpan — sinkron saat agent refresh config");
+      toast.success(
+        "Pengaturan agent disimpan — sinkron saat agent refresh config",
+      );
     },
-    onError: () => toast.error("Gagal menyimpan pengaturan agent"),
+    onError: (err) => toastApiError(err, "Gagal menyimpan pengaturan agent"),
   });
 
   if (!status?.paired) return null;
 
   return (
-    <div className="rounded-xl border border-base-300 bg-base-200/40 p-4 space-y-4">
+    <div className="rounded-xl border border-primary/15 bg-primary/5 p-4 space-y-4">
       <div className="flex items-center gap-2">
         <Volume2 className="w-4 h-4 text-primary" />
         <h3 className="font-semibold text-sm">Pengaturan Agent (PC kasir)</h3>
       </div>
       <p className="text-xs text-base-content/60">
-        Disimpan di server. Agent menerapkan setelah sync config (~30 detik) atau
-        restart.
+        Disimpan di server. Agent menerapkan setelah sync config (~30 detik)
+        atau restart.
       </p>
 
       <label className="flex items-center gap-3 cursor-pointer">
@@ -95,7 +98,7 @@ export default function AgentWorkstationSettings({
       {canEdit && (
         <button
           type="button"
-          className="btn btn-sm btn-primary"
+          className="btn btn-sm btn-primary border p-2 rounded-lg bg-primary text-white"
           disabled={save.isPending}
           onClick={() => save.mutate()}
         >

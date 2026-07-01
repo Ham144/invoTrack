@@ -5,21 +5,206 @@ import { toast } from "sonner";
 import { BuktiScanApi } from "@/api/invo-track";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { canManageInfrastructure } from "@/lib/permissions";
+import { toastApiError } from "@/lib/api-error";
+import {
+  parseRtspConfig,
+  rtspPayloadFromForm,
+  type RtspFormFields,
+} from "@/lib/rtsp-url";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { CctvConfig, DeviceStatus, SubscriptionQuota } from "@/types/invo-track";
+import type {
+  CctvConfig,
+  DeviceStatus,
+  SubscriptionQuota,
+} from "@/types/invo-track";
 
 type PendingAction = { type: "delete-cctv"; id: string; label: string };
+
+const EMPTY_FORM = {
+  label: "",
+  host: "",
+  channel: "101",
+  username: "",
+  password: "",
+};
+
+function CctvConnectionFields({
+  fields,
+  onChange,
+  size = "sm",
+}: {
+  fields: RtspFormFields;
+  onChange: (patch: Partial<RtspFormFields>) => void;
+  size?: "sm" | "xs";
+}) {
+  const inputCls =
+    size === "xs"
+      ? "input input-bordered input-xs w-full"
+      : "input-field w-full";
+
+  return (
+    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <label className="space-y-1">
+        <span className="text-xs font-medium muted">IP kamera</span>
+        <input
+          className={inputCls}
+          placeholder="192.168.168.50"
+          value={fields.host}
+          onChange={(e) => onChange({ host: e.target.value })}
+          autoComplete="off"
+        />
+      </label>
+      <label className="space-y-1">
+        <span className="text-xs font-medium muted">Kanal</span>
+        <input
+          className={inputCls}
+          placeholder="101"
+          value={fields.channel}
+          onChange={(e) => onChange({ channel: e.target.value })}
+          autoComplete="off"
+        />
+      </label>
+      <label className="space-y-1">
+        <span className="text-xs font-medium muted">Username</span>
+        <input
+          className={inputCls}
+          placeholder="admin"
+          value={fields.username}
+          onChange={(e) => onChange({ username: e.target.value })}
+          autoComplete="off"
+        />
+      </label>
+      <label className="space-y-1">
+        <span className="text-xs font-medium muted">Password</span>
+        <input
+          className={inputCls}
+          type="password"
+          placeholder="••••••••"
+          value={fields.password}
+          onChange={(e) => onChange({ password: e.target.value })}
+          autoComplete="new-password"
+        />
+      </label>
+    </div>
+  );
+}
+
+function CctvListItem({
+  c,
+  online,
+  canEdit,
+  onSnapshot,
+  onDelete,
+  onUpdateConnection,
+  onToggleActive,
+}: {
+  c: CctvConfig;
+  online?: boolean;
+  canEdit: boolean;
+  onSnapshot: () => void;
+  onDelete: () => void;
+  onUpdateConnection: (body: {
+    rtspUrl: string;
+    username: string;
+    password: string;
+  }) => void;
+  onToggleActive: (isActive: boolean) => void;
+}) {
+  const [fields, setFields] = useState(() => parseRtspConfig(c));
+
+  const saveConnection = () => {
+    if (!fields.host.trim() || !fields.username.trim()) {
+      toast.error("IP dan username wajib diisi");
+      return;
+    }
+    const parsed = parseRtspConfig(c);
+    const payload = rtspPayloadFromForm({ label: c.label, ...fields });
+    const unchanged =
+      parsed.host === fields.host &&
+      parsed.channel === fields.channel &&
+      parsed.username === fields.username &&
+      parsed.password === fields.password;
+    if (unchanged) return;
+    onUpdateConnection({
+      rtspUrl: payload.rtspUrl,
+      username: payload.username,
+      password: payload.password,
+    });
+  };
+
+  return (
+    <li className="subsection">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{c.label}</span>
+          {online === true && (
+            <span className="badge badge-success badge-xs">online</span>
+          )}
+          {online === false && (
+            <span className="badge badge-ghost badge-xs">offline</span>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className="btn btn-xs btn-outline gap-1"
+            onClick={onSnapshot}
+          >
+            <ImageIcon className="w-3 h-3" />
+            Snapshot
+          </button>
+          {canEdit && (
+            <button
+              type="button"
+              className="btn btn-xs btn-error btn-outline"
+              onClick={onDelete}
+            >
+              Hapus
+            </button>
+          )}
+        </div>
+      </div>
+
+      {canEdit ? (
+        <div className="space-y-3">
+          <CctvConnectionFields
+            size="xs"
+            fields={fields}
+            onChange={(patch) => setFields((f) => ({ ...f, ...patch }))}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs"
+                defaultChecked={c.isActive}
+                onChange={(e) => onToggleActive(e.target.checked)}
+              />
+              Aktif untuk rekam
+            </label>
+            <button
+              type="button"
+              className="btn btn-xs btn-primary border p-2 rounded-lg bg-primary text-white"
+              onClick={saveConnection}
+            >
+              Simpan koneksi
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs muted">
+          {parseRtspConfig(c).host} · kanal {parseRtspConfig(c).channel}
+        </p>
+      )}
+    </li>
+  );
+}
 
 export default function TenantIoTSettings() {
   const qc = useQueryClient();
   const user = useSessionStore((s) => s.user);
   const canEdit = canManageInfrastructure(user?.role);
-  const [cctvForm, setCctvForm] = useState({
-    label: "",
-    rtspUrl: "",
-    username: "",
-    password: "",
-  });
+  const [cctvForm, setCctvForm] = useState(EMPTY_FORM);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
 
@@ -52,20 +237,14 @@ export default function TenantIoTSettings() {
   );
 
   const addCctv = useMutation({
-    mutationFn: () =>
-      BuktiScanApi.cctvCreate({
-        label: cctvForm.label,
-        rtspUrl: cctvForm.rtspUrl,
-        username: cctvForm.username || undefined,
-        password: cctvForm.password || undefined,
-      }),
+    mutationFn: () => BuktiScanApi.cctvCreate(rtspPayloadFromForm(cctvForm)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cctv-config"] });
       qc.invalidateQueries({ queryKey: ["cctv-quota"] });
-      setCctvForm({ label: "", rtspUrl: "", username: "", password: "" });
+      setCctvForm(EMPTY_FORM);
       toast.success("CCTV ditambahkan");
     },
-    onError: () => toast.error("Gagal menambah CCTV"),
+    onError: (err) => toastApiError(err, "Gagal menambah CCTV"),
   });
 
   const deleteCctv = useMutation({
@@ -83,7 +262,6 @@ export default function TenantIoTSettings() {
       ...body
     }: {
       id: string;
-      label?: string;
       rtspUrl?: string;
       username?: string | null;
       password?: string | null;
@@ -93,7 +271,7 @@ export default function TenantIoTSettings() {
       qc.invalidateQueries({ queryKey: ["cctv-config"] });
       toast.success("CCTV diperbarui");
     },
-    onError: () => toast.error("Gagal memperbarui CCTV"),
+    onError: (err) => toastApiError(err, "Gagal memperbarui CCTV"),
   });
 
   const takeSnapshot = async (id: string) => {
@@ -103,26 +281,30 @@ export default function TenantIoTSettings() {
       if (snapshotUrl) URL.revokeObjectURL(snapshotUrl);
       setSnapshotUrl(url);
     } catch {
-      toast.error("Snapshot gagal — cek URL RTSP & kredensial");
+      toast.error("Snapshot gagal — cek IP, kanal, username & password");
     }
   };
 
   const cameras = cctv.data ?? [];
   const q = quota.data;
+  const canAdd =
+    cctvForm.label.trim() &&
+    cctvForm.host.trim() &&
+    cctvForm.username.trim() &&
+    !(q && q.currentCctv >= q.maxCctv);
 
   return (
     <div className="space-y-6">
       {!canEdit && (
-        <div className="alert alert-warning text-sm py-3">
+        <div className="warn-callout">
           Mode baca saja — hanya Admin Organisasi yang dapat mengubah CCTV.
         </div>
       )}
 
-      <div className="alert alert-info py-3 text-sm">
-        <p>
-          Preview live & tes USB scanner ada di <strong>BuktiScan Agent</strong>{" "}
-          di PC kasir. Di sini kelola URL RTSP dan kredensial rekam.
-        </p>
+      <div className="info-callout">
+        Isi <strong>IP</strong>, <strong>kanal</strong> (101 = stream utama, 102
+        = sub), <strong>username</strong>, dan <strong>password</strong> kamera
+        Hikvision. Tidak perlu mengetik URL RTSP panjang.
       </div>
 
       {q && (
@@ -135,155 +317,65 @@ export default function TenantIoTSettings() {
       )}
 
       {canEdit && (
-        <section className="surface-card">
-          <div className="card-body gap-4">
-            <h2 className="font-semibold flex items-center gap-2">
-              <Camera className="w-4 h-4 text-primary" />
-              Tambah CCTV RTSP
-            </h2>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <input
-                className="input input-bordered input-sm"
-                placeholder="Label titik rekam"
-                value={cctvForm.label}
-                onChange={(e) =>
-                  setCctvForm((f) => ({ ...f, label: e.target.value }))
-                }
-              />
-              <input
-                className="input input-bordered input-sm font-mono"
-                placeholder="rtsp://192.168.x.x/..."
-                value={cctvForm.rtspUrl}
-                onChange={(e) =>
-                  setCctvForm((f) => ({ ...f, rtspUrl: e.target.value }))
-                }
-              />
-              <input
-                className="input input-bordered input-sm"
-                placeholder="Username RTSP (opsional)"
-                value={cctvForm.username}
-                onChange={(e) =>
-                  setCctvForm((f) => ({ ...f, username: e.target.value }))
-                }
-              />
-              <input
-                className="input input-bordered input-sm"
-                type="password"
-                placeholder="Password RTSP (opsional)"
-                value={cctvForm.password}
-                onChange={(e) =>
-                  setCctvForm((f) => ({ ...f, password: e.target.value }))
-                }
-              />
-            </div>
-            <button
-              type="button"
-              className="btn btn-sm btn-primary w-fit"
-              onClick={() => addCctv.mutate()}
-              disabled={
-                addCctv.isPending ||
-                !cctvForm.label.trim() ||
-                !cctvForm.rtspUrl.trim() ||
-                (q ? q.currentCctv >= q.maxCctv : false)
+        <section className="subsection">
+          <h2 className="subsection-title flex items-center gap-2">
+            <Camera className="w-4 h-4 text-primary" />
+            Tambah CCTV
+          </h2>
+          <label className="block space-y-1 max-w-md">
+            <span className="text-xs font-medium muted">Label titik rekam</span>
+            <input
+              className="input-field w-full"
+              placeholder="Kasir Muara — Meja 1"
+              value={cctvForm.label}
+              onChange={(e) =>
+                setCctvForm((f) => ({ ...f, label: e.target.value }))
               }
-            >
-              Tambah CCTV
-            </button>
-          </div>
+            />
+          </label>
+          <CctvConnectionFields
+            fields={cctvForm}
+            onChange={(patch) => setCctvForm((f) => ({ ...f, ...patch }))}
+          />
+          <button
+            type="button"
+            className="btn-primary-soft"
+            onClick={() => addCctv.mutate()}
+            disabled={addCctv.isPending || !canAdd}
+          >
+            {addCctv.isPending ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              "Tambah CCTV"
+            )}
+          </button>
         </section>
       )}
 
       <section className="space-y-3">
-        <h2 className="font-semibold">Daftar CCTV</h2>
+        <h2 className="subsection-title">Daftar CCTV</h2>
         {cameras.length === 0 ? (
-          <p className="text-sm text-base-content/60">
-            Belum ada CCTV dikonfigurasi.
-          </p>
+          <p className="text-sm muted">Belum ada CCTV dikonfigurasi.</p>
         ) : (
           <ul className="grid gap-3">
-            {cameras.map((c) => {
-              const online = onlineById.get(c.id);
-              return (
-                <li
-                  key={c.id}
-                  className="card bg-base-100 border border-base-300 shadow-sm"
-                >
-                  <div className="card-body gap-3 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{c.label}</span>
-                        {online === true && (
-                          <span className="badge badge-success badge-xs">
-                            online
-                          </span>
-                        )}
-                        {online === false && (
-                          <span className="badge badge-ghost badge-xs">
-                            offline
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          className="btn btn-xs btn-outline gap-1"
-                          onClick={() => void takeSnapshot(c.id)}
-                        >
-                          <ImageIcon className="w-3 h-3" />
-                          Snapshot
-                        </button>
-                        {canEdit && (
-                          <button
-                            type="button"
-                            className="btn btn-xs btn-error btn-outline"
-                            onClick={() =>
-                              setPending({
-                                type: "delete-cctv",
-                                id: c.id,
-                                label: c.label,
-                              })
-                            }
-                          >
-                            Hapus
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    {canEdit ? (
-                      <>
-                        <input
-                          className="input input-bordered input-xs w-full font-mono"
-                          defaultValue={c.rtspUrl}
-                          onBlur={(e) => {
-                            const v = e.target.value.trim();
-                            if (v && v !== c.rtspUrl)
-                              updateCctv.mutate({ id: c.id, rtspUrl: v });
-                          }}
-                        />
-                        <label className="flex items-center gap-2 text-xs cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="checkbox checkbox-xs"
-                            defaultChecked={c.isActive}
-                            onChange={(e) =>
-                              updateCctv.mutate({
-                                id: c.id,
-                                isActive: e.target.checked,
-                              })
-                            }
-                          />
-                          Aktif untuk rekam
-                        </label>
-                      </>
-                    ) : (
-                      <p className="text-xs font-mono text-base-content/60 break-all">
-                        {c.rtspUrl}
-                      </p>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
+            {cameras.map((c) => (
+              <CctvListItem
+                key={c.id}
+                c={c}
+                online={onlineById.get(c.id)}
+                canEdit={canEdit}
+                onSnapshot={() => void takeSnapshot(c.id)}
+                onDelete={() =>
+                  setPending({ type: "delete-cctv", id: c.id, label: c.label })
+                }
+                onUpdateConnection={(body) =>
+                  updateCctv.mutate({ id: c.id, ...body })
+                }
+                onToggleActive={(isActive) =>
+                  updateCctv.mutate({ id: c.id, isActive })
+                }
+              />
+            ))}
           </ul>
         )}
       </section>

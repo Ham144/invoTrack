@@ -9,6 +9,7 @@ import type {
   ScannerLinkView,
 } from "../../electron/preload";
 import { findDuplicateUsbBindings, parseUsbId } from "../core/scan-parse";
+import { agentErrorMessage } from "../core/agent-error";
 import { LiveRtcPlayer } from "./LiveRtcPlayer";
 
 const AGENT_VERSION = "0.1.3";
@@ -332,7 +333,7 @@ export default function App() {
       });
       await refresh({ full: true });
     } catch (err) {
-      setPairError(err instanceof Error ? err.message : "Pairing gagal");
+      setPairError(agentErrorMessage(err, "Pairing gagal"));
     } finally {
       setPairLoading(false);
     }
@@ -349,7 +350,7 @@ export default function App() {
       setPreviewUrl(`data:image/jpeg;base64,${b64}`);
     } catch (err) {
       setPreviewUrl(null);
-      setPreviewError(err instanceof Error ? err.message : "Preview gagal");
+      setPreviewError(agentErrorMessage(err, "Preview gagal"));
     } finally {
       setPreviewLoading(false);
     }
@@ -388,7 +389,7 @@ export default function App() {
         `USB tersimpan: ${port.path} (${usbVendorId}:${usbProductId}) → ${label}`,
       );
     } catch (err) {
-      setUsbError(err instanceof Error ? err.message : "Pair USB gagal");
+      setUsbError(agentErrorMessage(err, "Pair USB gagal"));
     } finally {
       setUsbLoading(false);
     }
@@ -936,7 +937,7 @@ function TabKamera({
       setLiveKey((k) => k + 1);
     } catch (err) {
       setLiveActive(false);
-      setSnapshotError(err instanceof Error ? err.message : "Live preview gagal");
+      setSnapshotError(agentErrorMessage(err, "Live preview gagal"));
     }
   };
 
@@ -949,7 +950,7 @@ function TabKamera({
       const b64 = await window.BuktiScanAgent.captureCctvSnapshot(activeCctv.id);
       setSnapshotUrl(`data:image/jpeg;base64,${b64}`);
     } catch (err) {
-      setSnapshotError(err instanceof Error ? err.message : "Snapshot gagal");
+      setSnapshotError(agentErrorMessage(err, "Snapshot gagal"));
     } finally {
       setSnapshotLoading(false);
     }
@@ -1399,7 +1400,7 @@ function TabMonitor() {
         if (activeRef.current) setCells(rows);
       } catch (err) {
         if (activeRef.current) {
-          setBootError(err instanceof Error ? err.message : "Gagal menghubungkan stream");
+          setBootError(agentErrorMessage(err, "Gagal menghubungkan stream"));
         }
       } finally {
         if (activeRef.current) setLoading(false);
@@ -1448,7 +1449,7 @@ function TabMonitor() {
       if (activeRef.current) setCells(rows);
     } catch (err) {
       if (activeRef.current) {
-        setBootError(err instanceof Error ? err.message : "Gagal menghubungkan stream");
+        setBootError(agentErrorMessage(err, "Gagal menghubungkan stream"));
       }
     } finally {
       if (activeRef.current) setLoading(false);
@@ -1492,7 +1493,7 @@ function TabMonitor() {
     );
   }
 
-  const cols = cells.length <= 2 ? 1 : cells.length <= 4 ? 2 : 3;
+  const cols = Math.min(Math.max(cells.length, 1), 3);
   const recCount = cells.filter((c) => c.state === "recording").length;
   const offlineCount = cells.filter((c) => !c.scannerConnected).length;
 

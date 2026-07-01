@@ -94,15 +94,19 @@ async function init() {
     where: { organizationName: organization.name },
   });
 
+  const cctvHost = process.env.CCTV_HOST || '192.168.168.50';
+  const cctvUsername = process.env.CCTV_USERNAME || 'admin';
+  const cctvPassword = process.env.CCTV_PASSWORD || 'password';
+
   await prisma.cctvConfig.createMany({
     data: [
       {
         id: CCTV_JASA_ID,
         organizationName: organization.name,
         label: 'Kasir Muara — Kanal 101',
-        rtspUrl:
-          process.env.CCTV_RTSP_URL ||
-          'rtsp://admin:password@192.168.168.50:554/Streaming/Channels/101',
+        rtspUrl: `rtsp://${cctvHost}:554/Streaming/Channels/101`,
+        username: cctvUsername,
+        password: cctvPassword,
         isActive: true,
         isOnline: true,
         lastSeenAt: new Date(),
@@ -111,10 +115,9 @@ async function init() {
         id: CCTV_HAM_ID,
         organizationName: organization.name,
         label: 'Kasir Muara — Kanal 102',
-        rtspUrl:
-          process.env.CCTV_RTSP_URL_2 ||
-          process.env.CCTV_RTSP_URL ||
-          'rtsp://admin:password@192.168.168.50:554/Streaming/Channels/102',
+        rtspUrl: `rtsp://${cctvHost}:554/Streaming/Channels/102`,
+        username: cctvUsername,
+        password: cctvPassword,
         isActive: true,
         isOnline: true,
         lastSeenAt: new Date(),

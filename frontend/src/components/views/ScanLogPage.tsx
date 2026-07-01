@@ -1,5 +1,5 @@
 import DashboardFrame from "@/components/islands/DashboardFrame";
-import LiveScanLog from "@/components/islands/LiveScanLog";
+import TableScanLog from "@/components/islands/TableScanLog";
 import PageHeader from "@/components/ui/PageHeader";
 
 export default function ScanLogPage() {
@@ -9,7 +9,7 @@ export default function ScanLogPage() {
         title="Scan Log"
         subtitle="Metadata scan dari cloud — video lokal disinkronkan oleh agent di PC kasir."
       />
-      <LiveScanLog />
+      <TableScanLog />
     </DashboardFrame>
   );
 }

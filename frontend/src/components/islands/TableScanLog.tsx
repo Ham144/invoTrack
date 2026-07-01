@@ -7,7 +7,7 @@ import DataTable from "@/components/ui/DataTable";
 import StatusBadge from "@/components/ui/StatusBadge";
 import type { InvoiceScan, ScanStatusFilter } from "@/types/invo-track";
 
-export default function LiveScanLog() {
+export default function TableScanLog() {
   const qc = useQueryClient();
   const [watchScan, setWatchScan] = useState<InvoiceScan | null>(null);
   const [statusFilter, setStatusFilter] = useState<ScanStatusFilter>("ALL");
@@ -76,96 +76,34 @@ export default function LiveScanLog() {
 
   return (
     <div className="space-y-6">
-      {/* Alert Info dengan desain lebih menarik */}
-      <div className="alert alert-info py-3 px-4 text-sm bg-gradient-to-r from-info/10 to-info/5 border border-info/20 rounded-xl shadow-sm">
-        <div className="flex items-start gap-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-5 h-5 text-info shrink-0 mt-0.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <p className="text-info-content/90 leading-relaxed">
-            Daftar scan dari database cloud. File MP4 di{" "}
-            <span className="font-mono bg-info/20 px-1.5 py-0.5 rounded text-info-content font-semibold">
-              D:\BuktiScan\clips
-            </span>{" "}
-            otomatis disinkronkan saat agent jalan. Putar video hanya di PC
-            kasir (agent localhost:19500).
-          </p>
-        </div>
-      </div>
-
-      {/* Error Alert dengan desain lebih baik */}
       {isError && (
-        <div className="alert alert-error py-3 px-4 text-sm bg-gradient-to-r from-error/10 to-error/5 border border-error/20 rounded-xl shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2 w-full">
-            <div className="flex items-center gap-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-5 h-5 text-error shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-              <p className="text-error-content/90">
-                Gagal memuat scan log
-                {error instanceof Error && error.message
-                  ? `: ${error.message}`
-                  : ""}
-              </p>
-            </div>
+        <div className="rounded-lg border border-error bg-error/10 px-4 py-3 text-sm text-error">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p>
+              Gagal memuat scan log
+              {error instanceof Error && error.message
+                ? `: ${error.message}`
+                : ""}
+            </p>
             <button
               type="button"
-              className="btn btn-xs btn-ghost text-error-content hover:bg-error/20"
+              className="btn btn-xs btn-ghost text-error"
               onClick={() => void refetch()}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-3.5 h-3.5 mr-1"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
               Coba lagi
             </button>
           </div>
         </div>
       )}
 
-      {/* Filter & Search dengan desain lebih baik */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between bg-base-100/50 p-4 rounded-xl border border-base-300/30 backdrop-blur-sm">
-        <div className="flex flex-wrap gap-1.5 justify-center">
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <div className="tab-segment flex-wrap">
           {tabs.map((t) => (
             <button
               key={t.key}
               type="button"
-              className={`btn btn-sm min-w-[70px] px-3 rounded-lg transition-all duration-200 ${
-                statusFilter === t.key
-                  ? "btn-primary shadow-md shadow-primary/20"
-                  : "btn-ghost hover:bg-base-200/70"
+              className={`tab-segment-btn ${
+                statusFilter === t.key ? "tab-segment-btn-active" : ""
               }`}
               onClick={() => {
                 setStatusFilter(t.key);
@@ -192,16 +130,15 @@ export default function LiveScanLog() {
             />
           </svg>
           <input
-            className="input input-sm w-full pl-9 font-mono rounded-lg border-base-300/50 bg-base-100/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 placeholder:text-base-content/30"
-            placeholder="Cari invoice..."
+            className="input-field w-full pl-9 font-mono"
+            placeholder="Cari invoice…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </div>
 
-      {/* Data Table dengan desain lebih baik */}
-      <div className="bg-base-100/50 rounded-xl border border-base-300/30 backdrop-blur-sm overflow-hidden">
+      <div className="surface-card">
         <DataTable
           loading={isLoading}
           empty={!isLoading && !isError && items.length === 0}
