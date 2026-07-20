@@ -60,42 +60,42 @@ export default function PageHeader({
   }, []);
 
   return (
-    <header className="mb-8">
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        <div className="min-w-0 space-y-2">
+    <header className="mb-10">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+        <div className="min-w-0 space-y-3">
           {badge}
-          <h1 className="text-2xl md:text-[1.75rem] font-semibold tracking-tight">
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
             {title}
           </h1>
           {subtitle && (
-            <p className="text-sm muted max-w-2xl leading-relaxed">
+            <p className="text-base text-slate-500 max-w-2xl leading-relaxed">
               {subtitle}
             </p>
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
           <div className="relative" ref={searchRef}>
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/35 pointer-events-none" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               ref={inputRef}
               type="search"
               placeholder="Cari menu…"
-              className="input input-sm input-bordered w-full sm:w-52 pl-9 pr-8 bg-base-100 border-base-300 border p-2 rounded-lg"
+              className="w-full sm:w-64 pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all shadow-sm"
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
             />
             {isDropdownOpen && (
-              <ul className="absolute z-50 mt-1.5 w-full sm:w-64 bg-base-100 border border-base-300 rounded-lg shadow-panel py-1 max-h-56 overflow-y-auto">
+              <ul className="absolute z-50 mt-2 w-full sm:w-72 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 max-h-60 overflow-y-auto">
                 {searchResults.map((item) => (
                   <li key={item.href}>
                     <a
                       href={item.href}
-                      className="block px-3 py-2 text-sm hover:bg-base-200"
+                      className="block px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
                       onClick={() => setIsDropdownOpen(false)}
                     >
                       {item.label}
-                      <span className="text-xs text-base-content/40 ml-2">
+                      <span className="text-xs text-slate-400 ml-2 font-normal">
                         {item.groupLabel}
                       </span>
                     </a>

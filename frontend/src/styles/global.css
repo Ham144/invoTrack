@@ -8,34 +8,24 @@
   }
 
   body {
-    @apply bg-base-200 text-base-content;
+    @apply bg-slate-50 text-slate-900;
   }
 
   h1,
   h2,
   h3 {
-    @apply tracking-tight text-base-content;
+    @apply tracking-tight text-slate-900;
   }
 }
 
 @keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fade-in {
@@ -51,11 +41,11 @@
 }
 
 .scrollbar-thumb-base-300::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
 }
 
 .scrollbar-thumb-base-300::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
+  background-color: #e2e8f0;
   border-radius: 9999px;
 }
 
@@ -64,76 +54,69 @@
 }
 
 @layer components {
+  /* Vercel-like sleek cards */
   .surface-card {
-    @apply bg-base-100 rounded-xl border border-base-300 shadow-soft overflow-hidden;
+    @apply bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden;
   }
 
   .surface-card-body {
-    @apply p-5 md:p-6;
+    @apply p-6;
   }
 
   .section-head {
-    @apply px-5 md:px-6 py-4 border-b border-base-300 bg-base-100;
+    @apply px-6 py-4 border-b border-slate-100 bg-white;
   }
 
   .section-title {
-    @apply text-base font-semibold text-base-content;
+    @apply text-base font-semibold text-slate-900 tracking-tight;
   }
 
   .section-desc {
-    @apply text-sm mt-0.5 opacity-60;
+    @apply text-sm mt-1 text-slate-500 leading-relaxed;
   }
 
   .info-callout {
-    @apply rounded-lg border border-info px-4 py-3 text-sm;
-    background-color: color-mix(in oklch, var(--color-info) 8%, transparent);
+    @apply rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800;
   }
 
   .warn-callout {
-    @apply rounded-lg border border-warning px-4 py-3 text-sm;
-    background-color: color-mix(in oklch, var(--color-warning) 8%, transparent);
+    @apply rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800;
   }
 
   .tab-segment {
-    @apply inline-flex flex-wrap p-1 rounded-lg bg-base-200 border border-base-300;
+    @apply inline-flex p-1 rounded-lg bg-slate-100 border border-slate-200;
   }
 
   .tab-segment-btn {
-    @apply px-3 py-2 rounded-md text-sm font-medium opacity-60 transition-colors;
+    @apply px-4 py-1.5 rounded-md text-sm font-medium text-slate-500 transition-all hover:text-slate-900;
   }
 
   .tab-segment-btn-active {
-    @apply bg-base-100 text-base-content shadow-soft opacity-100;
+    @apply bg-white text-slate-900 shadow-sm border border-slate-200/50;
   }
 
   .input-field {
-    @apply w-full rounded-lg border border-base-300 bg-base-100 px-3 py-1.5 text-sm text-base-content;
-    @apply focus:border-primary focus:outline-none focus:ring-2;
-    --tw-ring-color: color-mix(in oklch, var(--color-primary) 15%, transparent);
+    @apply w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 transition-all;
+    @apply focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10;
   }
 
   .btn-primary-soft {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-primary-content shadow-soft transition-all;
-    background-color: var(--color-primary);
+    @apply inline-flex items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-900/10 active:bg-slate-950;
   }
 
   .subsection {
-    @apply rounded-xl border border-base-300 bg-base-100 p-4 md:p-5 space-y-4;
+    @apply rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4;
   }
 
   .subsection-title {
-    @apply text-sm font-semibold text-base-content;
+    @apply text-sm font-semibold text-slate-900 tracking-tight;
   }
 
   .muted {
-    @apply opacity-60;
+    @apply text-slate-500;
   }
 
   .muted-sm {
-    @apply text-xs opacity-50;
-  }
-
-  .btn-primary-soft:hover {
-    filter: brightness(0.95);
+    @apply text-xs text-slate-500;
   }
 }

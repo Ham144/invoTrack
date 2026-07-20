@@ -72,7 +72,7 @@ function DevicesPageContent() {
         subtitle="Konfigurasi admin: RTSP, workstation, scanner, pairing agent. Operasional USB & scan hanya di BuktiScan Agent PC kasir."
         badge={
           quota ? (
-            <span className="badge badge-sm badge-outline font-medium">
+            <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
               Plan {quota.plan}
             </span>
           ) : undefined

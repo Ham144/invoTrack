@@ -45,14 +45,14 @@ function SectionHeader({
   subtitle: string;
 }) {
   return (
-    <div className="text-center max-w-2xl mx-auto mb-12">
+    <div className="text-center max-w-3xl mx-auto mb-16">
       <h2
         id={id}
-        className="text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight"
+        className="text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight"
       >
         {title}
       </h2>
-      <p className="mt-3 text-slate-600 leading-relaxed">{subtitle}</p>
+      <p className="mt-4 text-lg text-slate-600 leading-relaxed">{subtitle}</p>
     </div>
   );
 }
@@ -179,8 +179,9 @@ export default function IndexPage() {
           </div>
         </section>
 
-        <section className="py-20 lg:py-24 bg-white">
-          <div className="max-w-6xl mx-auto px-6 lg:px-8">
+        <section className="relative py-24 lg:py-32 bg-white overflow-hidden">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] opacity-30 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100 via-transparent to-transparent blur-3xl" />
+          <div className="relative max-w-6xl mx-auto px-6 lg:px-8">
             <SectionHeader
               id="fitur"
               title="Fitur unggulan"
@@ -190,8 +191,12 @@ export default function IndexPage() {
           </div>
         </section>
 
-        <section className="py-20 lg:py-24 bg-slate-50 border-y border-slate-100">
-          <div className="max-w-6xl mx-auto px-6 lg:px-8">
+        <section className="relative py-24 lg:py-32 bg-slate-50 overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+          <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+          <div className="absolute -left-48 top-1/2 -translate-y-1/2 w-96 h-96 bg-blue-400/10 blur-[100px] pointer-events-none rounded-full" />
+          <div className="absolute -right-48 top-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-400/10 blur-[100px] pointer-events-none rounded-full" />
+          <div className="relative max-w-6xl mx-auto px-6 lg:px-8">
             <SectionHeader
               id="peran"
               title="Peran pengguna"
@@ -201,8 +206,9 @@ export default function IndexPage() {
           </div>
         </section>
 
-        <section className="py-20 lg:py-24 bg-white">
-          <div className="max-w-6xl mx-auto px-6 lg:px-8">
+        <section className="relative py-24 lg:py-32 bg-white overflow-hidden">
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] opacity-40 pointer-events-none bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-sky-100 via-transparent to-transparent blur-3xl" />
+          <div className="relative max-w-6xl mx-auto px-6 lg:px-8">
             <SectionHeader
               id="cara-kerja"
               title="Cara kerja"
@@ -223,9 +229,10 @@ export default function IndexPage() {
           </div>
         </section> */}
 
-        <section className="py-20 lg:py-24 bg-white">
-          <div className="max-w-6xl mx-auto px-6 lg:px-8">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <section className="py-24 lg:py-32 bg-slate-50 border-t border-slate-100 relative overflow-hidden">
+          <div className="absolute right-0 top-0 w-1/3 h-full bg-gradient-to-l from-white/50 to-transparent pointer-events-none" />
+          <div className="relative max-w-6xl mx-auto px-6 lg:px-8">
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
               <div>
                 <h2 className="text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
                   Kenapa {brand}?

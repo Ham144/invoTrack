@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Camera, ClipboardList, Radio } from "lucide-react";
+import { Camera, ClipboardList, Radio, Loader2, ExternalLink } from "lucide-react";
 import DashboardFrame from "@/components/islands/DashboardFrame";
 import ActiveRecordingsPanel from "@/components/islands/ActiveRecordingsPanel";
 import DeviceStatusPanel from "@/components/islands/DeviceStatusPanel";
@@ -66,7 +66,7 @@ function DashboardHomeContent() {
   const cctvOnline = devices?.cctv.filter((c) => c.isOnline).length ?? 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-fade-in pb-12">
       <PageHeader
         title="Ringkasan"
         subtitle="Monitor aktivitas scan, rekam CCTV, dan status perangkat gudang."
@@ -77,7 +77,7 @@ function DashboardHomeContent() {
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <StatCard
           label="Scan hari ini"
           value={statsLoading ? "…" : (stats?.totalScansToday ?? "—")}
@@ -102,83 +102,86 @@ function DashboardHomeContent() {
       {active.length > 0 && (
         <section className="surface-card">
           <div className="section-head">
-            <h2 className="section-title">Rekam aktif</h2>
-            <p className="section-desc">Invoice yang sedang direkam</p>
+            <h2 className="section-title text-amber-600 flex items-center gap-2">
+              <Radio className="h-4 w-4 animate-pulse" />
+              Rekam aktif
+            </h2>
+            <p className="section-desc">Invoice yang sedang direkam secara real-time</p>
           </div>
-          <div className="surface-card-body pt-4">
+          <div className="surface-card-body">
             <ActiveRecordingsPanel />
           </div>
         </section>
       )}
 
-      <section className="surface-card">
-        <div className="section-head flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="section-title">Scan terbaru</h2>
-            <p className="section-desc">5 entri terakhir · refresh 30 detik</p>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <section className="surface-card xl:col-span-2 flex flex-col">
+          <div className="section-head flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="section-title">Scan terbaru</h2>
+              <p className="section-desc">5 entri terakhir (refresh 30s)</p>
+            </div>
+            <a
+              href="/dashboard/scan-log"
+              className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1"
+            >
+              Lihat semua <ExternalLink className="h-3 w-3" />
+            </a>
           </div>
-          <a
-            href="/dashboard/scan-log"
-            className="text-sm font-medium text-primary hover:underline"
-          >
-            Lihat semua
-          </a>
-        </div>
 
-        {scansLoading ? (
-          <div className="p-10 flex justify-center">
-            <span className="loading loading-spinner loading-md text-primary" />
-          </div>
-        ) : (scans?.items.length ?? 0) === 0 ? (
-          <div className="p-12 text-center text-base-content/50 text-sm">
-            Belum ada scan. Gunakan BuktiScan Agent di PC kasir.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="table table-sm">
-              <thead>
-                <tr className="border-b border-base-300 text-base-content/50">
-                  <th className="font-medium">Invoice</th>
-                  <th className="font-medium">Status</th>
-                  <th className="font-medium">Durasi</th>
-                  <th className="font-medium">Scanner</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scans?.items.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-base-300/50 last:border-0"
-                  >
-                    <td className="font-mono text-sm font-medium">
-                      {row.invoiceNumber}
-                    </td>
-                    <td>
-                      <StatusBadge status={row.status} />
-                    </td>
-                    <td className="font-mono text-sm text-base-content/70">
-                      {scanDuration(row)}
-                    </td>
-                    <td className="text-sm text-base-content/70">
-                      {row.scannerConfig?.label ?? "—"}
-                    </td>
+          <div className="flex-1 p-0 overflow-x-auto">
+            {scansLoading ? (
+              <div className="flex h-48 items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+              </div>
+            ) : (scans?.items.length ?? 0) === 0 ? (
+              <div className="flex h-48 flex-col items-center justify-center text-center text-slate-500">
+                <ClipboardList className="h-8 w-8 mb-3 opacity-20" />
+                <p className="text-sm">Belum ada scan. Gunakan BuktiScan Agent di PC kasir.</p>
+              </div>
+            ) : (
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead className="bg-slate-50/50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-6 py-3 font-semibold text-slate-600">Invoice</th>
+                    <th className="px-6 py-3 font-semibold text-slate-600">Status</th>
+                    <th className="px-6 py-3 font-semibold text-slate-600">Durasi</th>
+                    <th className="px-6 py-3 font-semibold text-slate-600">Scanner</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {scans?.items.map((row) => (
+                    <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-3 font-mono text-sm font-medium text-slate-900">
+                        {row.invoiceNumber}
+                      </td>
+                      <td className="px-6 py-3">
+                        <StatusBadge status={row.status} />
+                      </td>
+                      <td className="px-6 py-3 font-mono text-sm text-slate-500">
+                        {scanDuration(row)}
+                      </td>
+                      <td className="px-6 py-3 text-slate-500">
+                        {row.scannerConfig?.label ?? "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
-        )}
-      </section>
+        </section>
 
-      <section className="surface-card">
-        <div className="section-head">
-          <h2 className="section-title">Status CCTV</h2>
-          <p className="section-desc">Ketersediaan kamera organisasi</p>
-        </div>
-        <div className="surface-card-body pt-4">
-          <DeviceStatusPanel />
-        </div>
-      </section>
+        <section className="surface-card flex flex-col">
+          <div className="section-head">
+            <h2 className="section-title">Status CCTV</h2>
+            <p className="section-desc">Ketersediaan kamera</p>
+          </div>
+          <div className="surface-card-body flex-1 bg-slate-50/30">
+            <DeviceStatusPanel />
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
