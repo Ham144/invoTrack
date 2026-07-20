@@ -235,8 +235,8 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 p-4 md:p-8 pt-16 md:pt-8">
-        <div className="max-w-6xl mx-auto animate-fade-in-up">{children}</div>
+      <main className="flex-1 p-3">
+        <div className="max-w-9xl mx-auto animate-fade-in-up">{children}</div>
       </main>
     </div>
   );

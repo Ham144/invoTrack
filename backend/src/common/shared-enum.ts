@@ -1,6 +1,6 @@
 export const SubscriptionPlan = {
   TRIAL: { maxCctv: 1, maxScanner: 1, durationDays: 14 },
-  PRO: { maxCctv: 6, maxScanner: 6, durationDays: 30 },
+  PRO: { maxCctv: 6, maxScanner: 6, durationDays: 3650 }, // 10 tahun untuk development/internal
 } as const;
 
 export enum ROLE {

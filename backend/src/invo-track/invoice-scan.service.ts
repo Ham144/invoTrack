@@ -34,6 +34,11 @@ export interface ScanListQuery {
   limit?: number;
   status?: string;
   search?: string;
+  operator?: string;
+  workstationId?: string;
+  scannerConfigId?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface ActiveRecordingRow {
@@ -94,6 +99,40 @@ export class InvoiceScanService {
       where.invoiceNumber = { contains: search, mode: 'insensitive' };
     }
 
+    if (query.operator && query.operator.trim()) {
+      where.scannedByUsername = {
+        contains: query.operator.trim(),
+        mode: 'insensitive',
+      };
+    }
+
+    if (query.workstationId && query.workstationId !== 'ALL') {
+      where.workstationId = query.workstationId;
+    }
+
+    if (query.scannerConfigId && query.scannerConfigId !== 'ALL') {
+      where.scannerConfigId = query.scannerConfigId;
+    }
+
+    if (query.startDate || query.endDate) {
+      where.scannedAt = {};
+      if (query.startDate) {
+        const start = new Date(query.startDate);
+        if (!isNaN(start.getTime())) {
+          where.scannedAt.gte = start;
+        }
+      }
+      if (query.endDate) {
+        const end = new Date(query.endDate);
+        if (!isNaN(end.getTime())) {
+          if (query.endDate.length <= 10) {
+            end.setHours(23, 59, 59, 999);
+          }
+          where.scannedAt.lte = end;
+        }
+      }
+    }
+
     const [items, total] = await Promise.all([
       this.prisma.invoiceScan.findMany({
         where,
@@ -106,6 +145,21 @@ export class InvoiceScanService {
     ]);
 
     return { items, total, page, limit };
+  }
+
+  async listOperators(userInfo: TokenPayload) {
+    const scans = await this.prisma.invoiceScan.findMany({
+      where: {
+        organizationName: userInfo.organizationName,
+        scannedByUsername: { not: null },
+      },
+      select: { scannedByUsername: true },
+      distinct: ['scannedByUsername'],
+    });
+    return scans
+      .map((s) => s.scannedByUsername)
+      .filter((u): u is string => !!u)
+      .sort();
   }
 
   async findByInvoice(userInfo: TokenPayload, invoiceNumber: string) {

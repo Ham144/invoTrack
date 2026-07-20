@@ -18,12 +18,14 @@ export default function AgentWorkstationSettings({
   const qc = useQueryClient();
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [ttsVolume, setTtsVolume] = useState(80);
+  const [clipRetentionDays, setClipRetentionDays] = useState(14);
   const [clipsDir, setClipsDir] = useState("");
 
   useEffect(() => {
     if (!status) return;
     setTtsEnabled(status.ttsEnabled !== false);
     setTtsVolume(status.ttsVolume ?? 80);
+    setClipRetentionDays(status.clipRetentionDays ?? 14);
     setClipsDir(status.clipsDir ?? "");
   }, [status]);
 
@@ -32,6 +34,7 @@ export default function AgentWorkstationSettings({
       BuktiScanApi.agentUpdateSettings(workstationId, {
         ttsEnabled,
         ttsVolume,
+        clipRetentionDays,
         clipsDir: clipsDir.trim() || undefined,
       }),
     onSuccess: () => {
@@ -93,6 +96,27 @@ export default function AgentWorkstationSettings({
           disabled={!canEdit}
           onChange={(e) => setClipsDir(e.target.value)}
         />
+      </div>
+
+      <div>
+        <label className="text-xs text-base-content/60 mb-1 block">
+          Hapus otomatis rekaman lama (hari)
+        </label>
+        <input
+          type="number"
+          min={0}
+          max={365}
+          className="input input-bordered input-sm w-full"
+          value={clipRetentionDays}
+          disabled={!canEdit}
+          onChange={(e) =>
+            setClipRetentionDays(Math.max(0, Number(e.target.value) || 0))
+          }
+        />
+        <p className="text-xs text-base-content/50 mt-1">
+          0 = nonaktif. Default 14 hari (sesuai masa garansi marketplace).
+          Agent membersihkan saat startup dan tiap 6 jam.
+        </p>
       </div>
 
       {canEdit && (

@@ -76,6 +76,7 @@ export interface AgentStatus {
   diskCheckedAt?: string | null;
   ttsEnabled?: boolean;
   ttsVolume?: number;
+  clipRetentionDays?: number;
   pairingExpiresAt?: string | null;
 }
 

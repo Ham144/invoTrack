@@ -1,14 +1,14 @@
-import axios from 'axios';
-import { BASE_URL } from './constants';
-import { toast } from 'sonner';
+import axios from "axios";
+import { BASE_URL } from "./constants";
+import { toast } from "sonner";
 
 const axiosInstance = axios.create({
   withCredentials: true,
   baseURL: BASE_URL,
   timeout: 30000,
   headers: {
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
+    Accept: "application/json",
+    "Content-Type": "application/json",
   },
 });
 
@@ -18,11 +18,15 @@ function runRefresh(): Promise<boolean> {
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = axios
-    .post('/api/user/refresh-token', {}, {
-      withCredentials: true,
-      baseURL: BASE_URL || undefined,
-      timeout: 15000,
-    })
+    .post(
+      "/api/user/refresh-token",
+      {},
+      {
+        withCredentials: true,
+        baseURL: BASE_URL || undefined,
+        timeout: 15000,
+      },
+    )
     .then((res) => res.status >= 200 && res.status < 300)
     .catch(() => false)
     .finally(() => {
@@ -40,22 +44,22 @@ axiosInstance.interceptors.response.use(
 
     const isAuthError = error.response?.status === 401;
     const isForbiddenError = error.response?.status === 403;
-    const requestUrl = originalRequest.url || '';
+    const requestUrl = originalRequest.url || "";
     const isPublicRoute =
-      requestUrl.includes('/api/user/login') ||
-      requestUrl.includes('/api/user/refresh-token');
+      requestUrl.includes("/api/user/login") ||
+      requestUrl.includes("/api/user/refresh-token");
 
     if (isAuthError && !originalRequest._retry && !isPublicRoute) {
       originalRequest._retry = true;
       const ok = await runRefresh();
       if (ok) return axiosInstance(originalRequest);
-      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-        window.location.href = '/';
+      if (typeof window !== "undefined" && window.location.pathname !== "/") {
+        window.location.href = "/";
       }
     }
 
     if (isForbiddenError) {
-      toast.error('Anda tidak memiliki hak akses.');
+      toast.error("Anda tidak memiliki hak akses.");
     }
 
     return Promise.reject(error);

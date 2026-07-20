@@ -301,10 +301,15 @@ export default function TenantIoTSettings() {
         </div>
       )}
 
-      <div className="info-callout">
-        Isi <strong>IP</strong>, <strong>kanal</strong> (101 = stream utama, 102
-        = sub), <strong>username</strong>, dan <strong>password</strong> kamera
-        Hikvision. Tidak perlu mengetik URL RTSP panjang.
+      <div className="info-callout space-y-2">
+        <p>
+          Isi <strong>IP</strong>, <strong>kanal</strong> (101 = stream utama, 102
+          = sub), <strong>username</strong>, dan <strong>password</strong> kamera
+          Hikvision. Tidak perlu mengetik URL RTSP panjang.
+        </p>
+        <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+          ⚠️ Penting: Pastikan pengaturan <b>Video Encoding</b> pada kamera Anda (terutama Sub-Stream) diset ke <b>H.264</b>. Penggunaan H.265 dapat menyebabkan preview video di PC kasir sering terputus atau gagal dimuat.
+        </p>
       </div>
 
       {q && (

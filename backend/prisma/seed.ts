@@ -44,7 +44,15 @@ async function init() {
         create: { start: new Date(), plan: 'PRO' },
       },
     },
+    include: { subscription: true }
   });
+
+  if (organization.subscription) {
+    await prisma.organization.update({
+      where: { name: ORG_NAME },
+      data: { subscriptionId: organization.subscription.id }
+    });
+  }
 
   await prisma.subscription.updateMany({
     where: { organizationId: organization.name },

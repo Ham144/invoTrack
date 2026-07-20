@@ -7,6 +7,11 @@ export const BuktiScanApi = {
     limit?: number;
     status?: ScanStatusFilter;
     search?: string;
+    operator?: string;
+    workstationId?: string;
+    scannerConfigId?: string;
+    startDate?: string;
+    endDate?: string;
   }) =>
     axiosInstance.get("/api/invoice-scan/list", {
       params: {
@@ -15,8 +20,20 @@ export const BuktiScanApi = {
         status:
           params?.status && params.status !== "ALL" ? params.status : undefined,
         search: params?.search || undefined,
+        operator: params?.operator || undefined,
+        workstationId:
+          params?.workstationId && params.workstationId !== "ALL"
+            ? params.workstationId
+            : undefined,
+        scannerConfigId:
+          params?.scannerConfigId && params.scannerConfigId !== "ALL"
+            ? params.scannerConfigId
+            : undefined,
+        startDate: params?.startDate || undefined,
+        endDate: params?.endDate || undefined,
       },
     }),
+  operators: () => axiosInstance.get("/api/invoice-scan/operators"),
   scanFind: (invoiceNumber: string) =>
     axiosInstance.get(`/api/invoice-scan/${encodeURIComponent(invoiceNumber)}`),
   deviceStatus: () => axiosInstance.get("/api/invo-track/devices/status"),
@@ -65,6 +82,7 @@ export const BuktiScanApi = {
       ttsEnabled?: boolean;
       ttsVolume?: number;
       clipsDir?: string;
+      clipRetentionDays?: number;
     },
   ) =>
     axiosInstance.patch(

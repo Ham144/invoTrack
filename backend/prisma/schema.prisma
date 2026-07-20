@@ -86,6 +86,7 @@ model AgentDevice {
   diskCheckedAt    DateTime?
   ttsEnabled       Boolean      @default(true)
   ttsVolume        Int          @default(80)
+  clipRetentionDays Int         @default(14)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 }

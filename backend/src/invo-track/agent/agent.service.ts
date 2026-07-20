@@ -86,6 +86,7 @@ export class AgentService {
       diskCheckedAt: device?.diskCheckedAt ?? null,
       ttsEnabled: device?.ttsEnabled ?? true,
       ttsVolume: device?.ttsVolume ?? 80,
+      clipRetentionDays: device?.clipRetentionDays ?? 14,
       pairingExpiresAt: device?.pairingExpiresAt ?? null,
     };
   }
@@ -116,6 +117,9 @@ export class AgentService {
         ...(dto.ttsVolume !== undefined ? { ttsVolume: dto.ttsVolume } : {}),
         ...(dto.clipsDir !== undefined
           ? { clipsDir: dto.clipsDir.trim() }
+          : {}),
+        ...(dto.clipRetentionDays !== undefined
+          ? { clipRetentionDays: dto.clipRetentionDays }
           : {}),
       },
     });
@@ -198,7 +202,12 @@ export class AgentService {
 
     const device = await this.prisma.agentDevice.findUnique({
       where: { workstationId: agent.workstationId },
-      select: { clipsDir: true, ttsEnabled: true, ttsVolume: true },
+      select: {
+        clipsDir: true,
+        ttsEnabled: true,
+        ttsVolume: true,
+        clipRetentionDays: true,
+      },
     });
 
     return {
@@ -208,6 +217,7 @@ export class AgentService {
       clipsDir: device?.clipsDir ?? null,
       ttsEnabled: device?.ttsEnabled ?? true,
       ttsVolume: device?.ttsVolume ?? 80,
+      clipRetentionDays: device?.clipRetentionDays ?? 14,
       scanners: scanners.map((s) => ({
         id: s.id,
         label: s.label,

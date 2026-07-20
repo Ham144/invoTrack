@@ -113,4 +113,10 @@ export class UpdateAgentSettingsDto {
   @IsString()
   @IsOptional()
   clipsDir?: string;
+
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  @IsOptional()
+  clipRetentionDays?: number;
 }
