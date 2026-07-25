@@ -357,7 +357,7 @@ export class InvoiceScanService {
 
       this.recordingTimer.cancel(scanId);
 
-      if (scan.recordingSource === RecordingSource.EDGE) {
+      if (scan.recordingSource === RecordingSource.EDGE && !scan.stopRequestedAt) {
         await this.prisma.invoiceScan.update({
           where: { id: scanId },
           data: { stopRequestedAt: new Date() },
@@ -380,6 +380,7 @@ export class InvoiceScanService {
         data: {
           status: InvoiceScanStatus.COMPLETED,
           completedAt: new Date(),
+          stopRequestedAt: null,
           videoPath:
             scan.videoPath ||
             this.ffmpeg.getPublicVideoPath(

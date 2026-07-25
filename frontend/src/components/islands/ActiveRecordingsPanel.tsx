@@ -80,18 +80,33 @@ export default function ActiveRecordingsPanel() {
               )}
             </p>
           </div>
-          <button
-            type="button"
-            className="btn btn-sm btn-error btn-outline gap-1 shrink-0"
-            disabled={stoppingId === row.scanId || stop.isPending}
-            onClick={() => {
-              setStoppingId(row.scanId);
-              stop.mutate(row.scanId);
-            }}
-          >
-            <Square className="w-3.5 h-3.5" />
-            {stoppingId === row.scanId ? "Menghentikan…" : "Stop"}
-          </button>
+          {row.stopRequested ? (
+            <button
+              type="button"
+              className="btn btn-sm btn-error gap-1 shrink-0"
+              disabled={stoppingId === row.scanId || stop.isPending}
+              onClick={() => {
+                setStoppingId(row.scanId);
+                stop.mutate(row.scanId);
+              }}
+            >
+              <Square className="w-3.5 h-3.5" />
+              {stoppingId === row.scanId ? "Memaksa Berhenti…" : "Force Stop"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-sm btn-error btn-outline gap-1 shrink-0"
+              disabled={stoppingId === row.scanId || stop.isPending}
+              onClick={() => {
+                setStoppingId(row.scanId);
+                stop.mutate(row.scanId);
+              }}
+            >
+              <Square className="w-3.5 h-3.5" />
+              {stoppingId === row.scanId ? "Menghentikan…" : "Stop"}
+            </button>
+          )}
         </li>
       ))}
     </ul>

@@ -8,7 +8,6 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import type { InvoiceScan, ScanStatusFilter } from "@/types/invo-track";
 import {
   SlidersHorizontal,
-  X,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,

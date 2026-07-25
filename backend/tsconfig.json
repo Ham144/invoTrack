@@ -7,7 +7,6 @@
     "paths": {
       "src/*": ["./src/*"]
     },
-
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
@@ -16,7 +15,6 @@
     "sourceMap": true,
     "incremental": true,
     "skipLibCheck": true,
-
     "strictNullChecks": false,
     "noImplicitAny": false,
     "strictBindCallApply": false,

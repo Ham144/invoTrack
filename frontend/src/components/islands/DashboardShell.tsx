@@ -210,11 +210,10 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
           )}
           <div className="flex gap-x-3">
             <a
-              href="https://s-bit2.muara.co.id/project-library"
-              target="_blank"
-              className="btn btn-sm btn-ghost border p-2 rounded-lg bg-primary text-white"
+              href="/dashboard/docs"
+              className="btn-primary-soft w-full justify-start text-xs font-semibold px-3 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 shadow-none border border-blue-200/50"
             >
-              <BookOpen className="w-4 h-4" />
+              <BookOpen className="w-4 h-4 shrink-0" />
               Dokumentasi
             </a>
             <button

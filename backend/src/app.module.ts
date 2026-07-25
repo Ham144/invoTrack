@@ -17,6 +17,7 @@ import { BuktiScanModule } from './invo-track/invo-track.module';
     ServeStaticModule.forRoot({
       rootPath: path.join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
+      renderPath: '/*splat',
       serveStaticOptions: {
         index: false,
       },

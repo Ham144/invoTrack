@@ -64,72 +64,69 @@ export default function RecordingSettingsPanel() {
   const previewSec = noLimit ? 0 : minutes * 60;
 
   return (
-    <div className="rounded-lg border border-base-300/80 bg-base-100 p-4 md:p-5 space-y-5">
-      {!canEdit && (
-        <div className="warn-callout">
-          Mode baca saja — hanya Admin Organisasi yang dapat mengubah pengaturan
-          rekam.
-        </div>
-      )}
+    <div className="space-y-6">
       <div>
-        <h3 className="font-semibold text-lg">Pengaturan Rekam</h3>
-        <p className="text-sm text-base-content/70 mt-1">
-          Rekam otomatis berhenti saat salah satu kondisi terpenuhi (mana yang
-          lebih dulu):
+        <h3 className="font-semibold text-lg text-slate-900">Batas Waktu Auto-Cut</h3>
+        <p className="text-sm text-slate-500 mt-1">
+          Rekaman video CCTV otomatis berhenti saat salah satu kondisi terpenuhi (mana yang lebih dulu):
         </p>
       </div>
 
-      <ul className="text-sm space-y-2 list-disc list-inside text-base-content/80">
-        <li>Operator scan invoice berikutnya pada scanner/CCTV yang sama</li>
-        <li>Mencapai batas waktu di bawah (jika diaktifkan)</li>
+      <ul className="text-sm space-y-2 list-disc list-inside text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-4">
+        <li>Operator melakukan scan invoice berikutnya pada scanner/CCTV yang sama.</li>
+        <li>Durasi perekaman mencapai batas durasi maksimal di bawah.</li>
       </ul>
 
-      <label className="flex items-center gap-3 cursor-pointer">
-        <input
-          type="checkbox"
-          className="checkbox checkbox-primary checkbox-sm border p-2 rounded-lg "
-          checked={noLimit}
-          disabled={!canEdit}
-          onChange={(e) => setNoLimit(e.target.checked)}
-        />
-        <span className="text-sm">
-          Tanpa batas waktu (hanya auto-cut scan berikutnya)
-        </span>
-      </label>
-
-      {!noLimit && (
-        <div className="form-control max-w-xs">
-          <label className="label">
-            <span className="label-text">Batas durasi rekam (menit)</span>
-          </label>
+      <div className="space-y-4">
+        <label className="flex items-center gap-3 cursor-pointer">
           <input
-            type="number"
-            min={0}
-            max={120}
-            className="input input-bordered border p-2 rounded-lg w-full"
-            value={minutes}
+            type="checkbox"
+            className="checkbox checkbox-primary checkbox-sm"
+            checked={noLimit}
             disabled={!canEdit}
-            onChange={(e) => setMinutes(Math.max(1, Number(e.target.value)))}
+            onChange={(e) => setNoLimit(e.target.checked)}
           />
-        </div>
-      )}
+          <span className="text-sm font-medium text-slate-700">
+            Tanpa batas waktu (hanya auto-cut saat scan berikutnya)
+          </span>
+        </label>
+
+        {!noLimit && (
+          <div className="space-y-1.5 max-w-xs">
+            <span className="text-xs font-semibold text-slate-500 uppercase">Batas durasi rekam (menit)</span>
+            <input
+              type="number"
+              min={1}
+              max={120}
+              className="input-field w-full"
+              value={minutes}
+              disabled={!canEdit}
+              onChange={(e) => setMinutes(Math.max(1, Number(e.target.value)))}
+            />
+          </div>
+        )}
+      </div>
 
       <div className="info-callout">
-        Rekam berhenti otomatis
+        Status: Rekaman akan berhenti otomatis
         {previewSec > 0
-          ? ` setelah ${formatDuration(previewSec)}`
-          : " hanya saat invoice berikutnya di-scan"}
+          ? ` setelah mencapai ${formatDuration(previewSec)}`
+          : " hanya jika invoice berikutnya di-scan"}
         .
       </div>
 
       {canEdit && (
         <button
           type="button"
-          className="btn btn-primary w-fit border p-2 rounded-lg bg-primary text-white"
+          className="btn-primary-soft"
           disabled={save.isPending}
           onClick={() => save.mutate()}
         >
-          {save.isPending ? "Menyimpan..." : "Simpan pengaturan"}
+          {save.isPending ? (
+            <span className="loading loading-spinner loading-xs" />
+          ) : (
+            "Simpan Pengaturan"
+          )}
         </button>
       )}
     </div>

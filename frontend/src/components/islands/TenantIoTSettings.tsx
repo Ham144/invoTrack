@@ -295,12 +295,6 @@ export default function TenantIoTSettings() {
 
   return (
     <div className="space-y-6">
-      {!canEdit && (
-        <div className="warn-callout">
-          Mode baca saja — hanya Admin Organisasi yang dapat mengubah CCTV.
-        </div>
-      )}
-
       <div className="info-callout space-y-2">
         <p>
           Isi <strong>IP</strong>, <strong>kanal</strong> (101 = stream utama, 102
@@ -311,15 +305,6 @@ export default function TenantIoTSettings() {
           ⚠️ Penting: Pastikan pengaturan <b>Video Encoding</b> pada kamera Anda (terutama Sub-Stream) diset ke <b>H.264</b>. Penggunaan H.265 dapat menyebabkan preview video di PC kasir sering terputus atau gagal dimuat.
         </p>
       </div>
-
-      {q && (
-        <div className="flex flex-wrap gap-2">
-          <span className="badge badge-outline">Plan {q.plan}</span>
-          <span className="badge badge-outline">
-            CCTV {q.currentCctv}/{q.maxCctv}
-          </span>
-        </div>
-      )}
 
       {canEdit && (
         <section className="subsection">

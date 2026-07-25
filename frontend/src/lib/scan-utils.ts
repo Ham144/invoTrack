@@ -5,7 +5,7 @@ export const AGENT_CLIP_PORT = 19500;
 export const AGENT_CLIP_BASE = `http://127.0.0.1:${AGENT_CLIP_PORT}`;
 
 export function safeInvoiceFileName(invoiceNumber: string): string {
-  return invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return invoiceNumber?.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
 export function agentClipUrl(invoiceNumber: string): string {

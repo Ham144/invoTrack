@@ -1,39 +1,18 @@
 import { useState } from "react";
-import { CheckCircle2, LogIn, MessageCircle } from "lucide-react";
+import { CheckCircle2, LogIn } from "lucide-react";
 import AppProviders from "./AppProviders";
 import LandingFeatureGrid from "./LandingFeatureGrid";
 import LandingHowItWorks from "./LandingHowItWorks";
-import LandingPricing from "./LandingPricing";
+
 import LandingRoles from "./LandingRoles";
 import LandingStats from "./LandingStats";
 import LoginModal from "./LoginModal";
 import {
   HERO_PILLS,
   LANDING_BENEFITS,
-  whatsappConsultUrl,
 } from "@/lib/landing";
 import { landingBadge, landingBtn } from "@/lib/landing-ui";
 
-function ConsultButton({
-  className = "",
-  size = "sm",
-}: {
-  className?: string;
-  size?: "sm" | "lg";
-}) {
-  const cls = size === "lg" ? landingBtn.outlineLightLg : landingBtn.ghostNav;
-  return (
-    <a
-      href={whatsappConsultUrl()}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`${cls} ${className}`}
-    >
-      <MessageCircle className="h-4 w-4 shrink-0" />
-      Konsultasi
-    </a>
-  );
-}
 
 function SectionHeader({
   id,

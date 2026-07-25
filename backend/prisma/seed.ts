@@ -44,13 +44,13 @@ async function init() {
         create: { start: new Date(), plan: 'PRO' },
       },
     },
-    include: { subscription: true }
+    include: { subscription: true },
   });
 
   if (organization.subscription) {
     await prisma.organization.update({
       where: { name: ORG_NAME },
-      data: { subscriptionId: organization.subscription.id }
+      data: { subscriptionId: organization.subscription.id },
     });
   }
 
@@ -204,7 +204,7 @@ async function init() {
   for (let i = 0; i < mockInvoices.length; i++) {
     const item = mockInvoices[i];
     const scannedAt = new Date(Date.now() - item.hoursAgo * 3600000);
-    const safeName = item.num.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeName = item.num?.replace(/[^a-zA-Z0-9_-]/g, '_');
     const localClipPath =
       item.status === InvoiceScanStatus.COMPLETED
         ? buildLocalClipPath('D:\\BuktiScan\\clips', item.num, scannedAt)
@@ -249,4 +249,11 @@ async function init() {
   await prisma.$disconnect();
 }
 
-init();
+init()
+  .then(() => {
+    console.log('✅ Seeding completed successfully!');
+  })
+  .catch((err) => {
+    console.error('❌ Seeding failed:', err);
+    process.exit(1);
+  });

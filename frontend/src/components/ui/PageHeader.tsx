@@ -1,4 +1,4 @@
-import { Search, X } from "lucide-react";
+import { Search } from "lucide-react";
 import { useState, type ReactNode, useEffect, useRef } from "react";
 import { NAV_GROUPS } from "../islands/DashboardShell";
 

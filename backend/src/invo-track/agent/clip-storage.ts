@@ -1,4 +1,4 @@
-import path from 'path';
+import * as path from 'path';
 
 export const MONTHLY_CLIPS_DIR_PATTERN = /^\d{4}-\d{2}$/;
 

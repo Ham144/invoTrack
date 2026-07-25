@@ -11,13 +11,22 @@ function getCorsOrigins(): string[] {
     process.env.FRONTEND_URL_DEV ||
     'http://localhost:4321,http://127.0.0.1:4321';
   const prod = process.env.FRONTEND_URL;
+  const origins: string[] = [];
   if (prod) {
-    return [prod];
+    origins.push(
+      ...prod
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+  } else {
+    origins.push(
+      ...dev
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
   }
-  const origins = dev
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
   origins.push('http://localhost:4321', 'http://127.0.0.1:4321');
   return [...new Set(origins)];
 }
@@ -56,6 +65,7 @@ async function bootstrap() {
   await app.listen(port, '0.0.0.0');
 }
 
-bootstrap().catch(() => {
+bootstrap().catch((err) => {
+  console.error('Error during bootstrap:', err);
   process.exit(1);
 });

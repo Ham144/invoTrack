@@ -65,6 +65,21 @@ function DevicesPageContent() {
     { key: "recording", label: "Rekam", icon: Settings },
   ];
 
+  const tabMetadata: Record<Tab, { title: string; desc: string }> = {
+    config: {
+      title: "Koneksi Kamera CCTV",
+      desc: "Koneksi RTSP, IP, dan kredensial stream kamera",
+    },
+    scanners: {
+      title: "Konfigurasi Workstation & Scanner",
+      desc: "Pairing agent PC Kasir, COM port, dan mapping operator/CCTV",
+    },
+    recording: {
+      title: "Batas Waktu Rekaman",
+      desc: "Konfigurasi durasi rekam maksimal dan perilaku auto-cut",
+    },
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -117,8 +132,12 @@ function DevicesPageContent() {
         />
       </div>
 
-      <section className="surface-card">
+      <section className="surface-card animate-fade-in-up">
         <div className="section-head flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="section-title">{tabMetadata[tab].title}</h2>
+            <p className="section-desc">{tabMetadata[tab].desc}</p>
+          </div>
           <div className="tab-segment" role="tablist">
             {tabs.map((t) => (
               <button
@@ -135,10 +154,6 @@ function DevicesPageContent() {
                 {t.label}
               </button>
             ))}
-          </div>
-          <div>
-            <h2 className="section-title">Pengaturan</h2>
-            <p className="section-desc">Pilih kategori konfigurasi</p>
           </div>
         </div>
 

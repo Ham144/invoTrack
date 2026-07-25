@@ -53,7 +53,7 @@ export default function LoginModal({
               className="input-field w-full"
               placeholder="username"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
               autoComplete="username"
               required
             />
