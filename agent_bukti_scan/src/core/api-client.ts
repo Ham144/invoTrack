@@ -11,7 +11,7 @@ function formatApiError(err: unknown, fallback: string): Error {
     if (typeof msg === "string" && msg.trim()) return new Error(msg);
     if (err.code === "ECONNREFUSED") {
       return new Error(
-        "Tidak bisa hubung ke server API. Periksa URL (mis. http://192.168.169.12:3001) dan pastikan backend jalan.",
+        "Tidak bisa hubung ke server API. Periksa URL dan pastikan backend jalan.",
       );
     }
   }
@@ -42,7 +42,6 @@ export interface AgentRemoteConfig {
   workstationId: string;
   recordingMaxDurationSec: number;
   clipsDir: string | null;
-  clipsDirSecondary: string | null;
   ttsEnabled?: boolean;
   ttsVolume?: number;
   clipRetentionDays?: number;

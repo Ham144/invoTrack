@@ -340,9 +340,6 @@ export class AgentRuntime {
     if (next.clipsDir) {
       this.config.clipsDir = next.clipsDir;
     }
-    if (next.clipsDirSecondary !== undefined) {
-      this.config.clipsDirSecondary = next.clipsDirSecondary ?? undefined;
-    }
     if (next.ttsEnabled !== undefined) {
       this.config.ttsEnabled = next.ttsEnabled;
     }
@@ -1101,11 +1098,10 @@ export class AgentRuntime {
     return deleted;
   }
 
-  async updateStorageSettings(settings: {
+  updateStorageSettings(settings: {
     clipsDir?: string;
     clipsDirSecondary?: string | null;
-  }): Promise<AgentConfig> {
-    console.log("AgentRuntime: Menjalankan updateStorageSettings dengan settings:", settings);
+  }): AgentConfig {
     if (settings.clipsDir !== undefined) {
       this.config.clipsDir = settings.clipsDir;
       this.status.clipsDir = settings.clipsDir;
@@ -1121,14 +1117,6 @@ export class AgentRuntime {
       fs.mkdirSync(this.config.clipsDirSecondary, { recursive: true });
     }
     this.mediaServer.start(this.config.clipsDir, this.config.clipsDirSecondary);
-
-    if (this.config.deviceToken) {
-      try {
-        await this.api.updateStorageSettings(settings);
-      } catch (err) {
-        console.error("Gagal menyinkronkan pengaturan penyimpanan ke cloud:", err);
-      }
-    }
 
     return { ...this.config };
   }
