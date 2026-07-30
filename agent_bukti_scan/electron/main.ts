@@ -372,10 +372,10 @@ ipcMain.handle(
 
 ipcMain.handle(
   "agent:update-storage-settings",
-  (_evt, payload: { clipsDir?: string; clipsDirSecondary?: string | null }) => {
+  async (_evt, payload: { clipsDir?: string; clipsDirSecondary?: string | null }) => {
     console.log("IPC Main: Menerima sinyal agent:update-storage-settings dengan payload:", payload);
     if (!runtime) throw new Error("Agent belum siap");
-    return runtime.updateStorageSettings(payload);
+    return await runtime.updateStorageSettings(payload);
   },
 );
 

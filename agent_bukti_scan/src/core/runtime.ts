@@ -14,6 +14,7 @@ import {
   formatFreeBytes,
   getFreeBytesForPath,
   isDiskLow,
+  arePathsOnSameDevice,
 } from "./disk-space";
 import { LocalRecorder } from "./recorder";
 import { listSerialPorts, ListedSerialPort, SerialManager } from "./serial";
@@ -70,6 +71,7 @@ export interface RuntimeStatus {
   diskFreeSecondaryLabel: string;
   diskLow: boolean;
   diskFreeLabel: string;
+  diskSameDevice: boolean;
   scanners: ScannerLinkStatus[];
   configSyncedAt: string | null;
   clipRetentionDays: number;
@@ -124,6 +126,7 @@ export class AgentRuntime {
     diskFreeSecondaryLabel: "—",
     diskLow: false,
     diskFreeLabel: "—",
+    diskSameDevice: false,
     scanners: [],
     configSyncedAt: null,
     clipRetentionDays: 14,
@@ -247,6 +250,7 @@ export class AgentRuntime {
     this.status.diskFreeBytes = freeBytes;
     this.status.diskLow = isDiskLow(freeBytes);
     this.status.diskFreeLabel = formatFreeBytes(freeBytes);
+    this.status.diskSameDevice = false;
 
     if (this.config.clipsDirSecondary) {
       const freeBytesSec = getFreeBytesForPath(this.config.clipsDirSecondary);
@@ -257,9 +261,18 @@ export class AgentRuntime {
       const secondaryLow = isDiskLow(freeBytesSec);
       this.status.diskLow = primaryLow && secondaryLow;
       
+      const isSame = arePathsOnSameDevice(this.config.clipsDir, this.config.clipsDirSecondary);
+      this.status.diskSameDevice = isSame;
+      
       if (freeBytes !== null && freeBytesSec !== null) {
-        this.status.diskFreeBytes = freeBytes + freeBytesSec;
-        this.status.diskFreeLabel = formatFreeBytes(freeBytes + freeBytesSec);
+        if (isSame) {
+          this.status.diskFreeBytes = freeBytes;
+          this.status.diskFreeLabel = formatFreeBytes(freeBytes);
+          this.status.diskLow = primaryLow;
+        } else {
+          this.status.diskFreeBytes = freeBytes + freeBytesSec;
+          this.status.diskFreeLabel = formatFreeBytes(freeBytes + freeBytesSec);
+        }
       }
     } else {
       this.status.diskFreeBytesSecondary = null;
@@ -339,6 +352,9 @@ export class AgentRuntime {
     this.remoteConfig = next;
     if (next.clipsDir) {
       this.config.clipsDir = next.clipsDir;
+    }
+    if (next.clipsDirSecondary !== undefined) {
+      this.config.clipsDirSecondary = next.clipsDirSecondary || undefined;
     }
     if (next.ttsEnabled !== undefined) {
       this.config.ttsEnabled = next.ttsEnabled;
@@ -1098,10 +1114,10 @@ export class AgentRuntime {
     return deleted;
   }
 
-  updateStorageSettings(settings: {
+  async updateStorageSettings(settings: {
     clipsDir?: string;
     clipsDirSecondary?: string | null;
-  }): AgentConfig {
+  }): Promise<AgentConfig> {
     if (settings.clipsDir !== undefined) {
       this.config.clipsDir = settings.clipsDir;
       this.status.clipsDir = settings.clipsDir;
@@ -1117,6 +1133,17 @@ export class AgentRuntime {
       fs.mkdirSync(this.config.clipsDirSecondary, { recursive: true });
     }
     this.mediaServer.start(this.config.clipsDir, this.config.clipsDirSecondary);
+
+    if (this.config.deviceToken) {
+      try {
+        await this.api.updateStorageSettings({
+          clipsDir: settings.clipsDir,
+          clipsDirSecondary: settings.clipsDirSecondary,
+        });
+      } catch (err) {
+        console.error("Gagal mengirim update storage settings ke backend:", err);
+      }
+    }
 
     return { ...this.config };
   }

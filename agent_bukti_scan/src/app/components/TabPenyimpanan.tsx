@@ -163,23 +163,48 @@ export function TabPenyimpanan({
           </div>
         </div>
         <div style={{ marginTop: 12, fontSize: 12, color: "#64748b" }}>
-          <div>
-            Ruang disk Disk 1 (Utama): <strong>{status.diskFreeLabel && !status.clipsDirSecondary ? status.diskFreeLabel : (status.diskFreeBytes !== null && status.diskFreeBytesSecondary !== null && status.diskFreeBytesSecondary !== undefined ? formatFreeBytes(status.diskFreeBytes - status.diskFreeBytesSecondary) : status.diskFreeLabel || "—")}</strong>
-          </div>
-          {status.clipsDirSecondary ? (
-            <div style={{ marginTop: 4 }}>
-              Ruang disk Disk 2 (Sekunder): <strong>{status.diskFreeSecondaryLabel ?? "—"}</strong>
-            </div>
-          ) : null}
-          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px dashed #e2e8f0", fontWeight: 600 }}>
-            Total Ruang Bebas Gabungan: <span style={{ color: "#0f766e" }}>{status.diskFreeLabel ?? "—"}</span>
-            {status.diskLow ? (
-              <span style={{ color: "#dc2626", marginLeft: 6, fontWeight: 400 }}>
-                — segera kosongkan drive
+        <div>
+          Ruang disk Disk 1 (Utama):{" "}
+          <strong>
+            {status.diskSameDevice
+              ? status.diskFreeLabel || "—"
+              : status.diskFreeLabel && !status.clipsDirSecondary
+              ? status.diskFreeLabel
+              : status.diskFreeBytes !== null &&
+                status.diskFreeBytesSecondary !== null &&
+                status.diskFreeBytesSecondary !== undefined
+              ? formatFreeBytes(
+                  status.diskFreeBytes - status.diskFreeBytesSecondary
+                )
+              : status.diskFreeLabel || "—"}
+          </strong>
+        </div>
+        {status.clipsDirSecondary ? (
+          <div style={{ marginTop: 4 }}>
+            Ruang disk Disk 2 (Sekunder):{" "}
+            <strong>{status.diskFreeSecondaryLabel ?? "—"}</strong>
+            {status.diskSameDevice ? (
+              <span style={{ color: "#64748b", fontWeight: 400, marginLeft: 6 }}>
+                (Drive sama)
               </span>
             ) : null}
           </div>
+        ) : null}
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px dashed #e2e8f0", fontWeight: 600 }}>
+          Total Ruang Bebas Gabungan:{" "}
+          <span style={{ color: "#0f766e" }}>{status.diskFreeLabel ?? "—"}</span>
+          {status.diskSameDevice ? (
+            <span style={{ color: "#64748b", fontWeight: 400, marginLeft: 6 }}>
+              (Drive sama)
+            </span>
+          ) : null}
+          {status.diskLow ? (
+            <span style={{ color: "#dc2626", marginLeft: 6, fontWeight: 400 }}>
+              — segera kosongkan drive
+            </span>
+          ) : null}
         </div>
+      </div>
       </div>
 
       <div style={S.card}>

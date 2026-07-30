@@ -64,14 +64,15 @@ export function scanVideoSrc(scan: InvoiceScan): string | null {
     return null;
   }
 
+  if (scan.videoPath) {
+    return encodeMediaPath(scan.videoPath);
+  }
+
   if (scan.recordingSource === "EDGE" || scan.localClipPath) {
     return agentClipUrl(scan.invoiceNumber);
   }
 
-  if (!scan.videoPath) {
-    return null;
-  }
-  return encodeMediaPath(scan.videoPath);
+  return null;
 }
 
 export function scanVideoLocalOnly(scan: InvoiceScan): boolean {

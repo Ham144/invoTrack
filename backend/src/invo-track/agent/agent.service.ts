@@ -293,8 +293,13 @@ export class AgentService {
     );
   }
 
-  async heartbeat(agent: AgentContext, dto: AgentHeartbeatDto) {
+  async heartbeat(agent: AgentContext, dto: AgentHeartbeatDto, clientIp?: string) {
     const now = new Date();
+    
+    if (clientIp) {
+      InvoiceScanService.setWorkstationIp(agent.workstationId, clientIp);
+    }
+
     await Promise.all([
       this.prisma.agentDevice.update({
         where: { workstationId: agent.workstationId },

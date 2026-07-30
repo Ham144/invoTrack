@@ -42,6 +42,7 @@ export interface AgentRemoteConfig {
   workstationId: string;
   recordingMaxDurationSec: number;
   clipsDir: string | null;
+  clipsDirSecondary?: string | null;
   ttsEnabled?: boolean;
   ttsVolume?: number;
   clipRetentionDays?: number;

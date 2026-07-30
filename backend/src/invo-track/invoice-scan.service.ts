@@ -71,6 +71,38 @@ export interface AgentActiveRecordingRow {
 
 @Injectable()
 export class InvoiceScanService {
+  private static workstationIps = new Map<string, string>();
+
+  static setWorkstationIp(workstationId: string, ip: string) {
+    if (!workstationId || !ip) return;
+    let cleanIp = ip.trim();
+    if (cleanIp.startsWith('::ffff:')) {
+      cleanIp = cleanIp.substring(7);
+    }
+    if (cleanIp === '::1') {
+      cleanIp = '127.0.0.1';
+    }
+    this.workstationIps.set(workstationId, cleanIp);
+  }
+
+  static getWorkstationIp(workstationId: string): string | null {
+    return this.workstationIps.get(workstationId) || null;
+  }
+
+  private mapScanIp<T extends { videoPath?: string | null; workstationId?: string | null }>(scan: T): T {
+    if (!scan || !scan.videoPath || !scan.workstationId) return scan;
+    if (scan.videoPath.includes('127.0.0.1')) {
+      const ip = InvoiceScanService.getWorkstationIp(scan.workstationId);
+      if (ip && ip !== '127.0.0.1') {
+        return {
+          ...scan,
+          videoPath: scan.videoPath.replace('127.0.0.1', ip),
+        };
+      }
+    }
+    return scan;
+  }
+
   private completing = new Set<string>();
 
   constructor(
@@ -144,7 +176,8 @@ export class InvoiceScanService {
       this.prisma.invoiceScan.count({ where }),
     ]);
 
-    return { items, total, page, limit };
+    const mappedItems = items.map((item) => this.mapScanIp(item));
+    return { items: mappedItems, total, page, limit };
   }
 
   async listOperators(userInfo: TokenPayload) {
@@ -171,7 +204,7 @@ export class InvoiceScanService {
       include: scanInclude,
     });
     if (!scan) throw new NotFoundException('Invoice tidak ditemukan');
-    return scan;
+    return this.mapScanIp(scan);
   }
 
   async listActiveRecordings(

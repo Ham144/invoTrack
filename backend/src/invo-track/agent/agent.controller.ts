@@ -5,6 +5,7 @@ import {
   Param,
   Post,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { AgentService } from './agent.service';
 import { AgentAuthGuard } from './agent-auth.guard';
@@ -56,8 +57,10 @@ export class AgentController {
   heartbeat(
     @AgentAuth() agent: AgentContext,
     @Body() dto: AgentHeartbeatDto,
+    @Req() req: any,
   ) {
-    return this.service.heartbeat(agent, dto);
+    const ip = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || '';
+    return this.service.heartbeat(agent, dto, ip);
   }
 
   @UseGuards(AgentAuthGuard)

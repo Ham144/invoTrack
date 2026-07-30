@@ -42,6 +42,7 @@ export interface RuntimeStatusView {
   diskFreeSecondaryLabel?: string;
   diskLow?: boolean;
   diskFreeLabel?: string;
+  diskSameDevice?: boolean;
   scanners: ScannerLinkView[];
   configSyncedAt: string | null;
   clipRetentionDays?: number;

@@ -91,3 +91,16 @@ export function formatFreeBytes(freeBytes: number | null): string {
   const mb = freeBytes / 1024 ** 2;
   return `${Math.round(mb)} MB`;
 }
+
+export function arePathsOnSameDevice(path1: string, path2: string): boolean {
+  const p1 = resolveProbePath(path1);
+  const p2 = resolveProbePath(path2);
+  if (!p1 || !p2) return false;
+  try {
+    const dev1 = fs.statSync(p1).dev;
+    const dev2 = fs.statSync(p2).dev;
+    return dev1 === dev2;
+  } catch {
+    return false;
+  }
+}
