@@ -53,6 +53,7 @@ export interface Workstation {
     lastSeenAt?: string | null;
     agentVersion?: string | null;
     clipsDir?: string | null;
+    clipsDirSecondary?: string | null;
   } | null;
 }
 
@@ -72,6 +73,7 @@ export interface AgentStatus {
   agentLastSeenAt?: string | null;
   agentVersion?: string | null;
   clipsDir?: string | null;
+  clipsDirSecondary?: string | null;
   diskFreeBytes?: number | null;
   diskCheckedAt?: string | null;
   ttsEnabled?: boolean;

@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
 } from '@nestjs/common';
 import { WorkstationService } from './workstation.service';
 import { AgentService } from './agent/agent.service';
@@ -71,7 +72,6 @@ export class WorkstationController {
     return this.agentService.getAgentStatus(id, userInfo);
   }
 
-  @Authorization('ADMIN_ORGANIZATION')
   @Patch(':id/agent/settings')
   updateAgentSettings(
     @Param('id') id: string,
@@ -79,5 +79,13 @@ export class WorkstationController {
     @Body() dto: UpdateAgentSettingsDto,
   ) {
     return this.agentService.updateAgentSettings(id, userInfo, dto);
+  }
+
+  @Put(':id/agent/storage-settings')
+  updateAgentStorageSettings(
+    @Param('id') id: string,
+    @Body() dto: { clipsDir?: string; clipsDirSecondary?: string | null },
+  ) {
+    return this.agentService.updateAgentStorageSettings(id, dto);
   }
 }

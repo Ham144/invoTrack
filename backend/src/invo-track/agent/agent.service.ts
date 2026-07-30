@@ -118,6 +118,9 @@ export class AgentService {
         ...(dto.clipsDir !== undefined
           ? { clipsDir: dto.clipsDir.trim() }
           : {}),
+        ...(dto.clipsDirSecondary !== undefined
+          ? { clipsDirSecondary: dto.clipsDirSecondary.trim() }
+          : {}),
         ...(dto.clipRetentionDays !== undefined
           ? { clipRetentionDays: dto.clipRetentionDays }
           : {}),
@@ -204,6 +207,7 @@ export class AgentService {
       where: { workstationId: agent.workstationId },
       select: {
         clipsDir: true,
+        clipsDirSecondary: true,
         ttsEnabled: true,
         ttsVolume: true,
         clipRetentionDays: true,
@@ -215,6 +219,7 @@ export class AgentService {
       workstationId: agent.workstationId,
       recordingMaxDurationSec: org?.recordingMaxDurationSec ?? 300,
       clipsDir: device?.clipsDir ?? null,
+      clipsDirSecondary: device?.clipsDirSecondary ?? null,
       ttsEnabled: device?.ttsEnabled ?? true,
       ttsVolume: device?.ttsVolume ?? 80,
       clipRetentionDays: device?.clipRetentionDays ?? 14,
@@ -384,6 +389,25 @@ export class AgentService {
       usbVendorId,
       usbProductId,
       serialPortPath: portPath,
+    };
+  }
+
+  async updateAgentStorageSettings(
+    id: string,
+    dto: { clipsDir?: string; clipsDirSecondary?: string | null },
+  ) {
+    await this.prisma.agentDevice.update({
+      where: {
+        workstationId: id,
+      },
+      data: {
+        clipsDir: dto.clipsDir,
+        clipsDirSecondary: dto.clipsDirSecondary,
+      },
+    });
+    console.log(dto);
+    return {
+      ok: true,
     };
   }
 }

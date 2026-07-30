@@ -20,6 +20,7 @@ export default function AgentWorkstationSettings({
   const [ttsVolume, setTtsVolume] = useState(80);
   const [clipRetentionDays, setClipRetentionDays] = useState(14);
   const [clipsDir, setClipsDir] = useState("");
+  const [clipsDirSecondary, setClipsDirSecondary] = useState("");
 
   useEffect(() => {
     if (!status) return;
@@ -27,6 +28,7 @@ export default function AgentWorkstationSettings({
     setTtsVolume(status.ttsVolume ?? 80);
     setClipRetentionDays(status.clipRetentionDays ?? 14);
     setClipsDir(status.clipsDir ?? "");
+    setClipsDirSecondary(status.clipsDirSecondary ?? "");
   }, [status]);
 
   const save = useMutation({
@@ -36,6 +38,7 @@ export default function AgentWorkstationSettings({
         ttsVolume,
         clipRetentionDays,
         clipsDir: clipsDir.trim() || undefined,
+        clipsDirSecondary: clipsDirSecondary.trim() || null,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["agent-status", workstationId] });
@@ -87,7 +90,7 @@ export default function AgentWorkstationSettings({
 
       <div>
         <label className="text-xs text-base-content/60 mb-1 block">
-          Folder klip (opsional)
+          Folder klip utama
         </label>
         <input
           className="input input-bordered input-sm w-full font-mono"
@@ -95,6 +98,19 @@ export default function AgentWorkstationSettings({
           value={clipsDir}
           disabled={!canEdit}
           onChange={(e) => setClipsDir(e.target.value)}
+        />
+      </div>
+
+      <div>
+        <label className="text-xs text-base-content/60 mb-1 block">
+          Folder klip sekunder (Disk 2 - opsional)
+        </label>
+        <input
+          className="input input-bordered input-sm w-full font-mono"
+          placeholder="E:\BuktiScan\clips"
+          value={clipsDirSecondary}
+          disabled={!canEdit}
+          onChange={(e) => setClipsDirSecondary(e.target.value)}
         />
       </div>
 

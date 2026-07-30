@@ -82,6 +82,7 @@ export const BuktiScanApi = {
       ttsEnabled?: boolean;
       ttsVolume?: number;
       clipsDir?: string;
+      clipsDirSecondary?: string | null;
       clipRetentionDays?: number;
     },
   ) =>

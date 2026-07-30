@@ -59,12 +59,6 @@ async function init() {
     data: { plan: 'PRO' },
   });
 
-  await prisma.globalsetting.upsert({
-    where: { settingName: 'default' },
-    update: {},
-    create: { inUse: true, settingName: 'default' },
-  });
-
   for (const seedUser of SEED_USERS) {
     const passwordHash = await bcrypt.hash(seedUser.password, 10);
     await prisma.user.upsert({
