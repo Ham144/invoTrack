@@ -522,7 +522,7 @@ export default function WorkstationScannerSettings() {
       </div>
 
       {/* Edit Scanner Modal */}
-      <dialog className={`modal ${editScanner ? "modal-open" : ""}`}>
+      <dialog className={`modal ${editScanner ? "modal-open" : ""}`} open={!!editScanner}>
         <div className="modal-box max-w-md p-6 border border-slate-200 shadow-xl rounded-xl">
           <h3 className="font-bold text-lg text-slate-900 border-b border-slate-100 pb-3 mb-4">
             Edit Scanner

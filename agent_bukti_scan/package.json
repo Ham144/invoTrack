@@ -104,7 +104,7 @@
     },
     "publish": {
       "provider": "generic",
-      "url": "http://placeholder/downloads/"
+      "url": "http://192.168.169.27/downloads/"
     }
   }
 }

@@ -11,7 +11,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.90.5",
     "axios": "^1.13.1",
-    "daisyui": "^5.4.2",
+    "daisyui": "^4.12.23",
     "lucide-react": "^0.454.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

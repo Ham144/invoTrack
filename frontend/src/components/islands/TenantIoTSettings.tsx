@@ -371,7 +371,7 @@ export default function TenantIoTSettings() {
       </section>
 
       {snapshotUrl && (
-        <dialog className="modal modal-open">
+        <dialog className="modal modal-open" >
           <div className="modal-box max-w-2xl">
             <h3 className="font-bold mb-3">Snapshot CCTV</h3>
             <img

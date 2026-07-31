@@ -20,7 +20,7 @@ export default function ConfirmDialog({
   danger?: boolean;
 }) {
   return (
-    <dialog className={`modal ${open ? "modal-open" : ""}`}>
+    <dialog className={`modal ${open ? "modal-open" : ""}`} open={open}>
       <div className="modal-box">
         <h3 className="font-bold text-lg">{title}</h3>
         <div className="py-3 text-sm text-base-content/80">{message}</div>

@@ -34,7 +34,7 @@ export default function LoginModal({
   };
 
   return (
-    <dialog className={`modal ${open ? "modal-open" : ""}`}>
+    <dialog className={`modal ${open ? "modal-open" : ""}`} open={open}>
       <div className="modal-box max-w-md p-0 border border-base-300 shadow-panel">
         <div className="px-6 pt-6 pb-4 border-b border-base-300">
           <div className="flex items-center gap-3">

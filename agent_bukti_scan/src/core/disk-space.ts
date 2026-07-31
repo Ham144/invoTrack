@@ -21,7 +21,9 @@ export function resolveProbePath(targetPath: string): string | null {
   let parent = path.dirname(probe);
   while (parent !== probe) {
     if (fs.existsSync(parent)) return parent;
-    parent = path.dirname(parent);
+    const nextParent = path.dirname(parent);
+    if (nextParent === parent) break;
+    parent = nextParent;
   }
   return null;
 }

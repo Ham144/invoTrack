@@ -348,7 +348,7 @@ export class AgentRuntime {
       next.scanners,
       forceReconnect,
     );
-
+    
     this.remoteConfig = next;
     if (next.clipsDir) {
       this.config.clipsDir = next.clipsDir;
