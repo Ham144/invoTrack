@@ -102,12 +102,12 @@ export class AgentApiClient {
   }
 
   async pair(
-    workstationId: string,
+    workstationId: string | undefined,
     pairingCode: string,
   ): Promise<PairResult> {
     try {
       const res = await this.http.post<PairResult>("/api/agent/pair", {
-        workstationId: workstationId.trim(),
+        ...(workstationId ? { workstationId: workstationId.trim() } : {}),
         pairingCode: pairingCode.trim().toUpperCase(),
       });
       return res.data;
