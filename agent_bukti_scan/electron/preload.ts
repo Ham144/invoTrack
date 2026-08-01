@@ -159,7 +159,7 @@ contextBridge.exposeInMainWorld("BuktiScanAgent", {
     >,
   pair: (payload: {
     apiBaseUrl: string;
-    workstationId: string;
+    workstationId?: string;
     pairingCode: string;
     clipsDir?: string;
   }) =>
@@ -228,7 +228,7 @@ export interface BuktiScanAgentBridge {
   }) => Promise<AgentScannerView[]>;
   pair: (payload: {
     apiBaseUrl: string;
-    workstationId: string;
+    workstationId?: string;
     pairingCode: string;
     clipsDir?: string;
   }) => Promise<unknown>;
