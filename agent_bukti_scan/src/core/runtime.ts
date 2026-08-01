@@ -693,7 +693,7 @@ export class AgentRuntime {
 
   async pair(
     apiBaseUrl: string,
-    workstationId: string,
+    workstationId: string | undefined,
     pairingCode: string,
     clipsDir?: string,
   ): Promise<void> {
