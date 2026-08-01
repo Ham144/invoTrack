@@ -134,7 +134,6 @@ export default function App() {
     try {
       await window.BuktiScanAgent.pair({
         apiBaseUrl,
-        workstationId,
         pairingCode,
         clipsDir: clipsDir || undefined,
       });
@@ -232,7 +231,7 @@ export default function App() {
             BuktiScan Agent
           </h1>
           <p style={{ color: "#64748b", marginTop: 0, marginBottom: 24, fontSize: 12 }}>
-            Masukkan Workstation ID + kode pairing dari dashboard web.
+            Masukkan kode pairing dari dashboard web.
           </p>
           <div style={{ display: "grid", gap: 12 }}>
             <label>
@@ -241,14 +240,6 @@ export default function App() {
                 style={S.input}
                 value={apiBaseUrl}
                 onChange={(e) => setApiBaseUrl(e.target.value)}
-              />
-            </label>
-            <label>
-              <div style={S.label}>Workstation ID</div>
-              <input
-                style={S.input}
-                value={workstationId}
-                onChange={(e) => setWorkstationId(e.target.value)}
               />
             </label>
             <label>
@@ -273,9 +264,9 @@ export default function App() {
               style={{
                 ...S.btnPrimary,
                 opacity:
-                  pairLoading || !workstationId || !pairingCode ? 0.6 : 1,
+                  pairLoading || !pairingCode ? 0.6 : 1,
               }}
-              disabled={pairLoading || !workstationId || !pairingCode}
+              disabled={pairLoading || !pairingCode}
               onClick={() => void onPair()}
             >
               {pairLoading ? "Menghubungkan..." : "Pair & mulai agent"}
