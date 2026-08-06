@@ -198,7 +198,6 @@ async function init() {
   for (let i = 0; i < mockInvoices.length; i++) {
     const item = mockInvoices[i];
     const scannedAt = new Date(Date.now() - item.hoursAgo * 3600000);
-    const safeName = item.num?.replace(/[^a-zA-Z0-9_-]/g, '_');
     const localClipPath =
       item.status === InvoiceScanStatus.COMPLETED
         ? buildLocalClipPath('D:\\BuktiScan\\clips', item.num, scannedAt)
@@ -228,10 +227,7 @@ async function init() {
         recordingSource: 'EDGE',
         workstationId: WORKSTATION_ID,
         localClipPath,
-        videoPath:
-          item.status === InvoiceScanStatus.COMPLETED
-            ? `http://127.0.0.1:19500/clips/${safeName}.mp4`
-            : null,
+        videoPath: null,
         scannerConfigId: item.scannerId,
         cctvConfigId: cctvId,
         scannedByUsername: operator,

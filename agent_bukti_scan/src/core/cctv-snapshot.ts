@@ -43,7 +43,7 @@ function captureFfmpeg(
       "error",
       ...ffmpegRtspInputArgs(transport),
       "-i",
-      rtspUrl.trim(),
+      rtspUrl?.trim(),
       "-frames:v",
       "1",
       "-f",

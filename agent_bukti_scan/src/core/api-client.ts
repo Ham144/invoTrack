@@ -74,9 +74,9 @@ export interface AgentRecentScan {
 
 export interface PairResult {
   deviceToken: string;
-  workstationId: string;
+  workstationId?: string;
   organizationName: string;
-  workstationLabel: string;
+  workstationLabel?: string;
 }
 
 export class AgentApiClient {
@@ -92,6 +92,17 @@ export class AgentApiClient {
   updateConfig(config: AgentConfig): void {
     this.config = config;
     this.http.defaults.baseURL = config.apiBaseUrl.replace(/\/$/, "");
+  }
+
+  private identityParams(): Record<string, string> {
+    const params: Record<string, string> = {};
+    if (this.config.pairingCode?.trim()) {
+      params.pairingCode = this.config.pairingCode.trim().toUpperCase();
+    }
+    if (this.config.workstationId?.trim()) {
+      params.workstationId = this.config.workstationId.trim();
+    }
+    return params;
   }
 
   private authHeaders() {
@@ -119,6 +130,7 @@ export class AgentApiClient {
   async fetchConfig(): Promise<AgentRemoteConfig> {
     const res = await this.http.get<AgentRemoteConfig>("/api/agent/config", {
       headers: this.authHeaders(),
+      params: this.identityParams(),
     });
     return res.data;
   }
@@ -149,6 +161,8 @@ export class AgentApiClient {
     clipsDir?: string;
     diskFreeBytes?: number;
     isRecording?: boolean;
+    lanIp?: string;
+    mediaPort?: number;
   }) {
     const res = await this.http.post(
       "/api/agent/heartbeat",
@@ -192,6 +206,7 @@ export class AgentApiClient {
     }>("/api/invoice-scan/list", {
       headers: this.authHeaders(),
       params: {
+        ...this.identityParams(),
         page: query.page,
         limit: query.limit,
         status: query.status && query.status !== "ALL" ? query.status : undefined,
@@ -244,20 +259,46 @@ export class AgentApiClient {
     return res.data as { completed: number; imported: number; skipped: number };
   }
 
+  async markClipsPurged(invoiceNumbers: string[]) {
+    if (!invoiceNumbers.length) return { updated: 0 };
+    const res = await this.http.post(
+      "/api/agent/clips/purged",
+      { invoiceNumbers },
+      { headers: this.authHeaders() },
+    );
+    return res.data as { updated: number };
+  }
+
   async updateStorageSettings(storageDirs: {
     clipsDir?: string;
     clipsDirSecondary?: string | null;
   }) {
+    const payload = {
+      ...storageDirs,
+      ...this.identityParams(),
+    };
 
-    console.log(storageDirs);
-    const workstationId = this.config.workstationId;
-    if (!workstationId) throw new Error("Workstation ID tidak ditemukan");
-
-    const res = await this.http.put(
-      `/api/workstation/${workstationId}/agent/storage-settings`,
-      storageDirs,
-      { headers: this.authHeaders() },
-    );
-    return res.data;
+    try {
+      const res = await this.http.put(
+        "/api/agent/storage-settings",
+        payload,
+        { headers: this.authHeaders() },
+      );
+      return res.data;
+    } catch (err) {
+      if (
+        isAxiosError(err) &&
+        (err.response?.status === 404 || err.response?.status === 405) &&
+        this.config.workstationId?.trim()
+      ) {
+        const res = await this.http.put(
+          `/api/workstation/${this.config.workstationId.trim()}/agent/storage-settings`,
+          payload,
+          { headers: this.authHeaders() },
+        );
+        return res.data;
+      }
+      throw formatApiError(err, "Update storage settings gagal");
+    }
   }
 }

@@ -38,15 +38,18 @@ export class SubscriptionLimitsService {
     const plan = this.resolvePlanKey(org.subscription?.plan);
     const limits = SubscriptionPlan[plan];
 
-    const [currentCctv, currentScanner] = await Promise.all([
+    const [currentCctv, currentScanner, workstationCount] = await Promise.all([
       this.prisma.cctvConfig.count({ where: { organizationName } }),
       this.prisma.scannerConfig.count({ where: { organizationName } }),
+      this.prisma.workstation.count({ where: { organizationName } }),
     ]);
+
+    const multiplier = Math.max(1, workstationCount);
 
     return {
       plan,
-      maxCctv: limits.maxCctv,
-      maxScanner: limits.maxScanner,
+      maxCctv: limits.maxCctv * multiplier,
+      maxScanner: limits.maxScanner * multiplier,
       durationDays: limits.durationDays,
       currentCctv,
       currentScanner,

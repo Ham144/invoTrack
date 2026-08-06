@@ -18,7 +18,14 @@ import { TabRiwayat } from "./components/TabRiwayat";
 
 const AGENT_VERSION = "0.1.3";
 
-export type Tab = "beranda" | "monitor" | "kamera" | "scanner" | "penyimpanan" | "riwayat" | "tentang";
+export type Tab =
+  | "beranda"
+  | "monitor"
+  | "kamera"
+  | "scanner"
+  | "penyimpanan"
+  | "riwayat"
+  | "tentang";
 
 export interface AgentConfig {
   apiBaseUrl: string;
@@ -50,7 +57,6 @@ export default function App() {
   const [serialPorts, setSerialPorts] = useState<ListedSerialPortView[]>([]);
 
   const [apiBaseUrl, setApiBaseUrl] = useState("");
-  const [workstationId, setWorkstationId] = useState("");
   const [pairingCode, setPairingCode] = useState("");
   const [clipsDir, setClipsDir] = useState("");
   const [pairLoading, setPairLoading] = useState(false);
@@ -93,7 +99,6 @@ export default function App() {
         setConfig(c);
         setApiBaseUrl((prev) => prev || c.apiBaseUrl || defaultApi);
         if (!clipsDir && c.clipsDir) setClipsDir(c.clipsDir);
-        if (!workstationId && c.workstationId) setWorkstationId(c.workstationId);
 
         let s = await window.BuktiScanAgent.getStatus();
         if (s?.paired && opts?.full) {
@@ -111,7 +116,7 @@ export default function App() {
         setBooting(false);
       }
     },
-    [applyStatus, clipsDir, workstationId],
+    [applyStatus, clipsDir],
   );
 
   useEffect(() => {
@@ -146,7 +151,9 @@ export default function App() {
   };
 
   const onUnpair = async () => {
-    const ok = window.confirm("Apakah Anda yakin ingin keluar session (unpair) workstation ini?");
+    const ok = window.confirm(
+      "Apakah Anda yakin ingin keluar session (unpair) workstation ini?",
+    );
     if (!ok) return;
     try {
       await window.BuktiScanAgent.unpair();
@@ -227,10 +234,24 @@ export default function App() {
         }}
       >
         <div style={S.pairingContainer}>
-          <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4, marginTop: 0 }}>
+          <h1
+            style={{
+              fontSize: 20,
+              fontWeight: 700,
+              marginBottom: 4,
+              marginTop: 0,
+            }}
+          >
             BuktiScan Agent
           </h1>
-          <p style={{ color: "#64748b", marginTop: 0, marginBottom: 24, fontSize: 12 }}>
+          <p
+            style={{
+              color: "#64748b",
+              marginTop: 0,
+              marginBottom: 24,
+              fontSize: 12,
+            }}
+          >
             Masukkan kode pairing dari dashboard web.
           </p>
           <div style={{ display: "grid", gap: 12 }}>
@@ -263,8 +284,7 @@ export default function App() {
               type="button"
               style={{
                 ...S.btnPrimary,
-                opacity:
-                  pairLoading || !pairingCode ? 0.6 : 1,
+                opacity: pairLoading || !pairingCode ? 0.6 : 1,
               }}
               disabled={pairLoading || !pairingCode}
               onClick={() => void onPair()}
@@ -282,15 +302,16 @@ export default function App() {
     );
   }
 
-  const pageStyle = tab === "monitor"
-    ? {
-        ...S.page,
-        maxWidth: "100%",
-        borderLeft: "none",
-        borderRight: "none",
-        boxShadow: "none",
-      }
-    : S.page;
+  const pageStyle =
+    tab === "monitor"
+      ? {
+          ...S.page,
+          maxWidth: "100%",
+          borderLeft: "none",
+          borderRight: "none",
+          boxShadow: "none",
+        }
+      : S.page;
 
   return (
     <div style={pageStyle}>
@@ -322,7 +343,8 @@ export default function App() {
               transition: "background-color 0.2s ease, border-color 0.2s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
+              e.currentTarget.style.backgroundColor =
+                "rgba(255, 255, 255, 0.15)";
               e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.8)";
             }}
             onMouseLeave={(e) => {
@@ -360,7 +382,7 @@ export default function App() {
         )}
         {tab === "monitor" && <TabMonitor config={config} />}
         {tab === "kamera" && (
-          <TabKamera
+          <TabKamera 
             cctvs={cctvs}
             activeCctvId={previewCctvId}
             onSelectCctv={setPreviewCctvId}

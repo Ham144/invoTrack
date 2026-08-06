@@ -1,7 +1,8 @@
 import type { InvoiceScan } from "@/types/invo-track";
 import {
+  scanClipPurged,
   scanDuration,
-  scanVideoLocalOnly,
+  scanVideoFromAgent,
   scanVideoSrc,
 } from "@/lib/scan-utils";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -14,8 +15,9 @@ interface ScanWatchModalProps {
 export default function ScanWatchModal({ scan, onClose }: ScanWatchModalProps) {
   if (!scan) return null;
 
+  const purged = scanClipPurged(scan);
   const videoSrc = scanVideoSrc(scan);
-  const localOnly = scanVideoLocalOnly(scan);
+  const fromAgent = scanVideoFromAgent(scan);
   const workstationLabel =
     scan.workstation?.label ?? scan.scannerConfig?.label ?? "PC kasir";
 
@@ -47,10 +49,17 @@ export default function ScanWatchModal({ scan, onClose }: ScanWatchModalProps) {
           </div>
         </div>
 
-        {localOnly && (
+        {purged && (
+          <p className="text-xs text-error mb-3">
+            Video otomatis terhapus karena melewati batas retensi di{" "}
+            {workstationLabel}.
+          </p>
+        )}
+
+        {!purged && fromAgent && (
           <p className="text-xs text-base-content/60 mb-3">
-            Video tersimpan lokal di {workstationLabel}. Playback hanya tersedia
-            di PC yang menjalankan BuktiScan Agent.
+            Streaming dari agent di {workstationLabel} (LAN). Pastikan PC kasir
+            online dan firewall mengizinkan port media agent.
           </p>
         )}
 
@@ -65,9 +74,11 @@ export default function ScanWatchModal({ scan, onClose }: ScanWatchModalProps) {
           <p className="text-sm text-base-content/60 py-12 text-center border border-dashed border-base-300 rounded-lg">
             {scan.status === "RECORDING"
               ? "Rekaman masih berjalan di agent..."
-              : localOnly
-                ? `Video ada di disk ${workstationLabel}. Buka dari PC kasir atau folder klip agent.`
-                : "Video belum tersedia."}
+              : purged
+                ? "File video sudah dihapus oleh retensi agent."
+                : fromAgent || scan.recordingSource === "EDGE"
+                  ? `Video belum bisa di-stream — agent ${workstationLabel} belum melaporkan alamat LAN, atau file belum tersedia.`
+                  : "Video belum tersedia."}
           </p>
         )}
 

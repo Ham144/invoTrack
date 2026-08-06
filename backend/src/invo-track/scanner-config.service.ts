@@ -85,6 +85,16 @@ export class ScannerConfigService {
       throw new BadRequestException('Workstation tidak ditemukan');
     }
 
+    const workstationScanners = await this.prisma.scannerConfig.count({
+      where: {
+        organizationName: userInfo.organizationName,
+        workstationId: dto.workstationId,
+      },
+    });
+    if (workstationScanners >= 6) {
+      throw new BadRequestException('Maksimal 6 scanner/CCTV per workstation');
+    }
+
     const cctv = await this.prisma.cctvConfig.findFirst({
       where: {
         id: dto.cctvConfigId,
@@ -148,6 +158,18 @@ export class ScannerConfigService {
         },
       });
       if (!ws) throw new BadRequestException('Workstation tidak ditemukan');
+
+      if (dto.workstationId !== existing.workstationId) {
+        const workstationScanners = await this.prisma.scannerConfig.count({
+          where: {
+            organizationName: userInfo.organizationName,
+            workstationId: dto.workstationId,
+          },
+        });
+        if (workstationScanners >= 6) {
+          throw new BadRequestException('Maksimal 6 scanner/CCTV per workstation');
+        }
+      }
     }
 
     if (dto.cctvConfigId) {

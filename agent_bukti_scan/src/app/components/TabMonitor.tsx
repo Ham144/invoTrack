@@ -171,6 +171,26 @@ export function TabMonitor({ config }: { config: AgentConfig | null }) {
       >     
         ℹ️ <strong>Tips Monitor:</strong> Untuk Preview dan rekam stabil dan tidak patah patah, ganti video encoding menjadi h.264 di di <strong>Configuration - video and audio - video encoding</strong> 
       </div>
+      <div
+        style={{
+          padding: "8px 12px",
+          background: "#fffbeb",
+          border: "1px solid #fde68a",
+          borderRadius: 6,
+          color: "#92400e",
+          fontSize: 12,
+          marginBottom: 12,
+          lineHeight: 1.5,
+        }}
+      >
+        <strong>Syarat tonton video dari website:</strong>
+        <ol style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+          <li>Agent online + heartbeat (LAN IP terkirim ke backend)</li>
+          <li>Browser dashboard & PC kasir di LAN yang sama</li>
+          <li>Firewall PC kasir izinkan port <strong>19500</strong></li>
+          <li>Restart backend + agent setelah deploy fitur streaming</li>
+        </ol>
+      </div>
       {stopError ? <p style={S.error}>{stopError}</p> : null}
       {snapshotError ? <p style={S.error}>{snapshotError}</p> : null}
       {refreshError ? <p style={S.error}>{refreshError}</p> : null}

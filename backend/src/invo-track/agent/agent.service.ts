@@ -16,6 +16,7 @@ import {
   AgentPairDto,
   UpdateAgentSettingsDto,
 } from './dto/agent.dto';
+import { DEFAULT_AGENT_MEDIA_PORT, sanitizeLanIp } from './agent-media-url';
 
 const PAIRING_TTL_MS = 15 * 60 * 1000;
 
@@ -87,6 +88,8 @@ export class AgentService {
       ttsEnabled: device?.ttsEnabled ?? true,
       ttsVolume: device?.ttsVolume ?? 80,
       clipRetentionDays: device?.clipRetentionDays ?? 14,
+      lanIp: device?.lanIp ?? null,
+      mediaPort: device?.mediaPort ?? DEFAULT_AGENT_MEDIA_PORT,
       pairingExpiresAt: device?.pairingExpiresAt ?? null,
     };
   }
@@ -116,13 +119,13 @@ export class AgentService {
         ...(dto.ttsEnabled !== undefined ? { ttsEnabled: dto.ttsEnabled } : {}),
         ...(dto.ttsVolume !== undefined ? { ttsVolume: dto.ttsVolume } : {}),
         ...(dto.clipsDir !== undefined
-          ? { clipsDir: dto.clipsDir.trim() }
+          ? { clipsDir: dto.clipsDir?.trim() }
           : {}),
         ...(dto.clipsDirSecondary !== undefined
-          ? { clipsDirSecondary: dto.clipsDirSecondary.trim() }
+          ? { clipsDirSecondary: dto.clipsDirSecondary?.trim() }
           : {}),
         ...(dto.clipRetentionDays !== undefined
-          ? { clipRetentionDays: dto.clipRetentionDays }
+          ? { clipRetentionDays: dto?.clipRetentionDays }
           : {}),
       },
     });
@@ -131,15 +134,18 @@ export class AgentService {
   }
 
   async pair(dto: AgentPairDto) {
-    const device = await this.prisma.agentDevice.findUnique({
-      where: { workstationId: dto.workstationId },
+    let device = await this.prisma.agentDevice.findUnique({
+      where: { pairingCode: dto.pairingCode },
       include: { workstation: true },
     });
 
-    if (!device?.pairingCode || !device.pairingExpiresAt) {
+    if (!device) {
+      throw new BadRequestException('Kode pairing tidak valid');
+    }
+    if (!device.pairingCode || !device.pairingExpiresAt) {
       throw new BadRequestException('Kode pairing belum dibuat di dashboard');
     }
-    if (device.pairingCode !== dto.pairingCode.trim().toUpperCase()) {
+    if (device.pairingCode !== dto.pairingCode?.trim().toUpperCase()) {
       throw new BadRequestException('Kode pairing tidak valid');
     }
     if (device.pairingExpiresAt.getTime() < Date.now()) {
@@ -164,13 +170,13 @@ export class AgentService {
     });
 
     await this.prisma.workstation.update({
-      where: { id: dto.workstationId },
+      where: { id: device.workstationId },
       data: { lastSeenAt: new Date() },
     });
 
     return {
       deviceToken: token,
-      workstationId: dto.workstationId,
+      workstationId: device.workstationId,
       organizationName: device.organizationName,
       workstationLabel: device.workstation.label,
     };
@@ -293,11 +299,41 @@ export class AgentService {
     );
   }
 
-  async heartbeat(agent: AgentContext, dto: AgentHeartbeatDto, clientIp?: string) {
+  async markClipsPurged(agent: AgentContext, invoiceNumbers: string[]) {
+    return this.invoiceScan.markClipsPurgedFromAgent(
+      agent.organizationName,
+      agent.workstationId,
+      invoiceNumbers,
+    );
+  }
+
+  async heartbeat(
+    agent: AgentContext,
+    dto: AgentHeartbeatDto,
+    clientIp?: string,
+  ) {
     const now = new Date();
-    
-    if (clientIp) {
-      InvoiceScanService.setWorkstationIp(agent.workstationId, clientIp);
+    const lanIp =
+      sanitizeLanIp(dto.lanIp) ?? sanitizeLanIp(clientIp) ?? undefined;
+    const mediaPort =
+      dto.mediaPort != null &&
+      Number.isFinite(dto.mediaPort) &&
+      dto.mediaPort > 0
+        ? Math.round(dto.mediaPort)
+        : undefined;
+
+    if (lanIp) {
+      InvoiceScanService.setWorkstationMedia(
+        agent.workstationId,
+        lanIp,
+        mediaPort ?? DEFAULT_AGENT_MEDIA_PORT,
+      );
+      await this.invoiceScan.backfillEdgeClipUrls(
+        agent.organizationName,
+        agent.workstationId,
+        lanIp,
+        mediaPort ?? DEFAULT_AGENT_MEDIA_PORT,
+      );
     }
 
     await Promise.all([
@@ -307,6 +343,8 @@ export class AgentService {
           lastSeenAt: now,
           agentVersion: dto.agentVersion,
           clipsDir: dto.clipsDir,
+          ...(lanIp ? { lanIp } : {}),
+          ...(mediaPort != null ? { mediaPort } : {}),
           ...(dto.diskFreeBytes != null
             ? {
                 diskFreeBytes: BigInt(
@@ -347,7 +385,7 @@ export class AgentService {
     usbProductId: number,
     serialPortPath: string,
   ) {
-    const portPath = serialPortPath.trim();
+    const portPath = serialPortPath?.trim();
     if (!portPath) {
       throw new BadRequestException('serialPortPath wajib diisi');
     }

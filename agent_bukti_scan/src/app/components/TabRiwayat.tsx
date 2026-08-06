@@ -13,6 +13,7 @@ interface InvoiceScanListItem {
   status: string;
   previousInvoice: string | null;
   scannedByUsername: string | null;
+  clipPurgedAt?: string | null;
   hasLocalFile?: boolean;
   cctvConfig?: { label: string } | null;
   scannerConfig?: { label: string } | null;
@@ -67,11 +68,6 @@ export function TabRiwayat({ config, status }: { config: AgentConfig | null; sta
     if (statusFilter !== "ALL") {
       query.status = statusFilter;
     }
-    // Always filter by this workstation to display local history only
-    if (config?.workstationId) {
-      query.workstationId = config.workstationId;
-    }
-
     window.BuktiScanAgent.listInvoiceScans(query)
       .then((res) => {
         setItems(res.items);
@@ -155,10 +151,13 @@ export function TabRiwayat({ config, status }: { config: AgentConfig | null; sta
     }
 
     const retentionDays = status?.clipRetentionDays ?? 14;
-    const scannedTime = new Date(scan.scannedAt).getTime();
-    const isExpired = Date.now() - scannedTime > retentionDays * 24 * 60 * 60 * 1000;
+    const purgedByRetention =
+      Boolean(scan.clipPurgedAt) ||
+      (retentionDays > 0 &&
+        Date.now() - new Date(scan.scannedAt).getTime() >
+          retentionDays * 24 * 60 * 60 * 1000);
 
-    if (isExpired && retentionDays > 0) {
+    if (purgedByRetention) {
       return (
         <span
           style={{

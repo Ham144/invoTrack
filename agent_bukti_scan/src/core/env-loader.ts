@@ -76,7 +76,23 @@ export function resolveDefaultApiBaseUrl(): string {
   loadAgentEnv();
   const fromProcess = process.env.BuktiScan_API_URL?.trim();
   if (fromProcess) return normalizeApiUrl(fromProcess);
-  return "http://192.168.169.27:3001";
+  return "http://127.0.0.1:3001";
+}
+
+/**
+ * Auto-update feed (folder that serves latest.yml + installer).
+ * Prefer BuktiScan_UPDATE_URL, else BuktiScan_WEB_URL/downloads.
+ * Do not assume API host serves /downloads (frontend static files).
+ */
+export function resolveUpdateFeedUrl(): string | null {
+  loadAgentEnv();
+  const explicit = process.env.BuktiScan_UPDATE_URL?.trim();
+  if (explicit) return normalizeApiUrl(explicit);
+
+  const web = process.env.BuktiScan_WEB_URL?.trim();
+  if (web) return `${normalizeApiUrl(web)}/downloads`;
+
+  return null;
 }
 
 export function resolveDefaultClipsDir(): string | undefined {

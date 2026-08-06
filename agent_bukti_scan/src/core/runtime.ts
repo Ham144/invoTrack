@@ -25,6 +25,7 @@ import {
   speak,
   TtsOptions,
 } from "./tts";
+import { agentMediaPort, detectLanIp } from "./lan-ip";
 
 export const AGENT_VERSION = "1.0.0";
 
@@ -175,6 +176,7 @@ export class AgentRuntime {
   /** Hapus token lokal agar agent kembali ke layar pairing. */
   unpair(): void {
     delete this.config.deviceToken;
+    delete this.config.pairingCode;
     delete this.config.workstationId;
     delete this.config.organizationName;
     delete this.config.workstationLabel;
@@ -364,6 +366,12 @@ export class AgentRuntime {
     }
     if (next.clipRetentionDays !== undefined) {
       this.config.clipRetentionDays = next.clipRetentionDays;
+    }
+    if (next.organizationName) {
+      this.config.organizationName = next.organizationName;
+    }
+    if (next.workstationId) {
+      this.config.workstationId = next.workstationId;
     }
     this.status.recordingMaxDurationSec = next.recordingMaxDurationSec ?? null;
     this.status.clipsDir = this.config.clipsDir;
@@ -699,6 +707,7 @@ export class AgentRuntime {
   ): Promise<void> {
     this.config.apiBaseUrl = apiBaseUrl.replace(/\/$/, "");
     this.config.clipsDir = clipsDir || this.config.clipsDir;
+    this.config.pairingCode = pairingCode.trim().toUpperCase();
     this.api.updateConfig(this.config);
 
     const result = await this.api.pair(workstationId, pairingCode);
@@ -992,11 +1001,14 @@ export class AgentRuntime {
     const heartbeat = async () => {
       try {
         this.refreshDiskStatus();
+        const lanIp = detectLanIp(this.config.apiBaseUrl);
         await this.api.heartbeat({
           agentVersion: AGENT_VERSION,
           clipsDir: this.config.clipsDir,
           diskFreeBytes: this.status.diskFreeBytes ?? undefined,
           isRecording: this.status.recording,
+          lanIp: lanIp ?? undefined,
+          mediaPort: agentMediaPort(),
         });
         await this.reconcileLocalClips();
       } catch (err) {
@@ -1022,29 +1034,42 @@ export class AgentRuntime {
     const days = this.config.clipRetentionDays ?? 14;
     if (days <= 0) return;
     try {
-      const deleted = this.purgeOldClips(days);
-      this.status.lastCleanupDeleted = deleted;
+      const purgedInvoices = this.purgeOldClips(days);
+      this.status.lastCleanupDeleted = purgedInvoices.length;
       this.status.lastCleanupAt = new Date().toISOString();
+      if (purgedInvoices.length > 0 && this.config.deviceToken) {
+        void this.api.markClipsPurged(purgedInvoices).catch(() => {
+          /* best-effort sync to backend */
+        });
+      }
     } catch (err) {
-      console.error("Gagal melakukan pembersihan klip:", err);
-      // Agar tidak menyetop program, cukup simpan pesan error di status
-      this.status.lastError = err instanceof Error ? `Cleanup gagal: ${err.message}` : "Cleanup gagal";
+      this.status.lastError =
+        err instanceof Error
+          ? `Cleanup gagal: ${err.message}`
+          : "Cleanup gagal";
     }
   }
 
-  purgeOldClips(retentionDays = 30): number {
-    let deleted = 0;
-    deleted += this.purgeOldClipsForDir(this.config.clipsDir, retentionDays);
+  purgeOldClips(retentionDays = 30): string[] {
+    const purged: string[] = [];
+    purged.push(
+      ...this.purgeOldClipsForDir(this.config.clipsDir, retentionDays),
+    );
     if (this.config.clipsDirSecondary) {
-      deleted += this.purgeOldClipsForDir(this.config.clipsDirSecondary, retentionDays);
+      purged.push(
+        ...this.purgeOldClipsForDir(
+          this.config.clipsDirSecondary,
+          retentionDays,
+        ),
+      );
     }
-    return deleted;
+    return [...new Set(purged)];
   }
 
-  private purgeOldClipsForDir(dir: string, retentionDays = 30): number {
-    if (!fs.existsSync(dir) || retentionDays <= 0) return 0;
+  private purgeOldClipsForDir(dir: string, retentionDays = 30): string[] {
+    if (!fs.existsSync(dir) || retentionDays <= 0) return [];
     const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
-    let deleted = 0;
+    const purgedInvoices: string[] = [];
 
     const purgeMp4InDir = (targetDir: string) => {
       if (!fs.existsSync(targetDir)) return;
@@ -1055,8 +1080,10 @@ export class AgentRuntime {
           try {
             const stat = fs.statSync(filePath);
             if (stat.mtimeMs < cutoff) {
+              const base = name.replace(/\.mp4$/i, "");
+              const invoiceNumber = base.split("--")[0];
               fs.unlinkSync(filePath);
-              deleted += 1;
+              if (invoiceNumber) purgedInvoices.push(invoiceNumber);
             }
           } catch {
             /* ignore individual file errors */
@@ -1111,7 +1138,7 @@ export class AgentRuntime {
       }
     }
 
-    return deleted;
+    return purgedInvoices;
   }
 
   async updateStorageSettings(settings: {

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { BuktiScanApi } from "@/api/invo-track";
-import { scanDuration, scanVideoLocalOnly } from "@/lib/scan-utils";
+import { scanDuration, scanClipPurged } from "@/lib/scan-utils";
 import ScanWatchModal from "@/components/islands/ScanWatchModal";
 import DataTable from "@/components/ui/DataTable";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -440,7 +440,17 @@ export default function TableScanLog() {
                       {row.scannedByUsername ?? "—"}
                     </td>
                     <td>
-                      <StatusBadge status={row.status} />
+                      <div className="flex flex-col gap-1 items-start">
+                        <StatusBadge status={row.status} />
+                        {scanClipPurged(row) ? (
+                          <span
+                            className="badge badge-sm badge-error badge-outline"
+                            title="Video otomatis terhapus karena melewati clipRetentionDays"
+                          >
+                            Terhapus (Expired)
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="font-mono text-xs text-base-content/60">
                       {scanDuration(row)}
@@ -456,6 +466,11 @@ export default function TableScanLog() {
                         type="button"
                         className="btn btn-xs btn-ghost btn-primary hover:bg-primary/10 hover:scale-105 transition-all duration-200"
                         onClick={() => setWatchScan(row)}
+                        disabled={
+                          scanClipPurged(row) ||
+                          row.status === "FAILED" ||
+                          row.status === "RECORDING"
+                        }
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -477,7 +492,7 @@ export default function TableScanLog() {
                             d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                           />
                         </svg>
-                        {scanVideoLocalOnly(row) ? "Putar lokal" : "Putar"}
+                        {scanClipPurged(row) ? "Expired" : "Putar"}
                       </button>
                     </td>
                   </tr>

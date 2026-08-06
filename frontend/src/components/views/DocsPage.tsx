@@ -1,6 +1,6 @@
 import DashboardFrame from "@/components/islands/DashboardFrame";
 import PageHeader from "@/components/ui/PageHeader";
-import { Camera, ScanLine, Users } from "lucide-react";
+import { Camera, ScanLine, Users, MonitorPlay } from "lucide-react";
 
 export default function DocsPage() {
   return (
@@ -73,6 +73,47 @@ export default function DocsPage() {
                 </ul>
               </div>
             </section>
+
+            <section className="surface-card">
+              <div className="section-head flex items-center gap-2">
+                <MonitorPlay className="w-5 h-5 text-blue-600" />
+                <h2 className="section-title">
+                  3. Tonton video dari website (streaming agent)
+                </h2>
+              </div>
+              <div className="surface-card-body prose prose-slate max-w-none prose-headings:font-bold prose-a:text-blue-600">
+                <p>
+                  Video rekaman tersimpan di PC kasir (agent). Dashboard memutar
+                  langsung dari LAN IP yang dilaporkan agent saat heartbeat —
+                  bukan dari localhost.
+                </p>
+                <p className="mt-3 font-medium text-slate-800">
+                  Syarat agar streaming jalan:
+                </p>
+                <ol className="list-decimal pl-5 space-y-2 mt-2 text-slate-700">
+                  <li>
+                    Agent online dan heartbeat aktif (backend menerima{" "}
+                    <strong>LAN IP</strong> PC kasir).
+                  </li>
+                  <li>
+                    Browser dashboard dan PC kasir berada di{" "}
+                    <strong>LAN yang sama</strong>.
+                  </li>
+                  <li>
+                    Firewall PC kasir mengizinkan inbound port{" "}
+                    <strong>19500</strong> (media clip agent).
+                  </li>
+                  <li>
+                    Setelah deploy fitur ini,{" "}
+                    <strong>restart backend + agent</strong>.
+                  </li>
+                </ol>
+                <p className="mt-4 text-slate-700">
+                  Putar video dari menu <strong>Scan Log</strong> → tombol{" "}
+                  <strong>Putar</strong>.
+                </p>
+              </div>
+            </section>
           </div>
 
           <div className="space-y-6">
@@ -109,6 +150,20 @@ export default function DocsPage() {
                     </a>
                   </li>
                 </ul>
+              </div>
+            </section>
+
+            <section className="surface-card border-amber-200/80 bg-amber-50/40">
+              <div className="section-head">
+                <h3 className="section-title text-amber-900">
+                  Checklist streaming
+                </h3>
+              </div>
+              <div className="surface-card-body text-sm text-amber-950/80 space-y-2">
+                <p>✓ Agent heartbeat (LAN IP)</p>
+                <p>✓ Browser & PC kasir satu LAN</p>
+                <p>✓ Firewall port 19500</p>
+                <p>✓ Restart backend + agent setelah deploy</p>
               </div>
             </section>
           </div>

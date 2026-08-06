@@ -55,4 +55,5 @@ Copy manual: `release/BuktiScanAgent-portable.zip` → `frontend/public/download
 
 ## Local clip playback
 
-`http://127.0.0.1:19500/clips/{invoice}.mp4` untuk dashboard di PC kasir yang sama.
+Agent serves clips on port `19500` (`0.0.0.0`) and reports its LAN IP via heartbeat.
+Dashboard streams `http://{agentLanIp}:19500/clips/{invoice}.mp4` from any PC on the same LAN.

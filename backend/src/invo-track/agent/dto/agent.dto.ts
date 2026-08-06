@@ -17,10 +17,7 @@ const ID_PATTERN =
 
 export class AgentPairDto {
   @IsString()
-  @IsNotEmpty()
-  @Matches(ID_PATTERN, { message: 'workstationId harus format UUID' })
-  workstationId: string;
-
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   pairingCode: string;
@@ -69,6 +66,12 @@ export class AgentReconcileClipsDto {
   clips: AgentReconcileClipDto[];
 }
 
+export class AgentPurgeClipsDto {
+  @IsArray()
+  @IsString({ each: true })
+  invoiceNumbers: string[];
+}
+
 export class AgentPairUsbDto {
   @IsInt()
   @Min(0)
@@ -97,6 +100,20 @@ export class AgentHeartbeatDto {
 
   @IsOptional()
   isRecording?: boolean;
+
+  /** Prefer agent-reported LAN IP for clip streaming from other PCs */
+  @IsString()
+  @IsOptional()
+  @Matches(/^\d{1,3}(\.\d{1,3}){3}$/, {
+    message: 'lanIp harus IPv4',
+  })
+  lanIp?: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  @IsOptional()
+  mediaPort?: number;
 }
 
 export class UpdateAgentSettingsDto {

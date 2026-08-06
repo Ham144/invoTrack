@@ -68,7 +68,7 @@ model AgentDevice {
   organizationName String
   organization     Organization @relation(fields: [organizationName], references: [name], onDelete: Cascade)
   deviceTokenHash  String
-  pairingCode      String?
+  pairingCode      String? @unique
   pairingExpiresAt DateTime?
   pairedAt         DateTime?
   agentVersion     String?
@@ -77,6 +77,9 @@ model AgentDevice {
   clipsDirSecondary String?
   diskFreeBytes    BigInt?
   diskCheckedAt    DateTime?
+  /** LAN IPv4 reported by agent for EDGE clip streaming */
+  lanIp            String?
+  mediaPort        Int          @default(19500)
   ttsEnabled       Boolean      @default(true)
   ttsVolume        Int          @default(80)
   clipRetentionDays Int         @default(14)
@@ -133,6 +136,8 @@ model InvoiceScan {
   localClipPath     String?
   recordingSource   String         @default("EDGE")
   status            String         @default("RECORDING")
+  /** Set when agent auto-deletes the local clip (clipRetentionDays) */
+  clipPurgedAt      DateTime?
   stopRequestedAt   DateTime?
   previousInvoice   String?
   workstationId     String?

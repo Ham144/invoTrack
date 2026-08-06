@@ -1,0 +1,5 @@
+{
+    "gitdoc.enabled": true,
+    "gitdoc.ai.enabled": false,
+    "gitdoc.autoCommitDelay": 2000
+}

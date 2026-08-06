@@ -8,6 +8,7 @@ export interface InvoiceScan {
   localClipPath?: string | null;
   recordingSource?: 'EDGE' | 'SERVER' | string;
   status: 'RECORDING' | 'COMPLETED' | 'FAILED';
+  clipPurgedAt?: string | null;
   stopRequestedAt?: string | null;
   previousInvoice?: string | null;
   workstationId?: string | null;
@@ -79,6 +80,8 @@ export interface AgentStatus {
   ttsEnabled?: boolean;
   ttsVolume?: number;
   clipRetentionDays?: number;
+  lanIp?: string | null;
+  mediaPort?: number;
   pairingExpiresAt?: string | null;
 }
 

@@ -10,6 +10,13 @@ Agent Progress & Features Checklist:
 [x] Kestabilan UI Live Preview Sub-stream - Menghilangkan bug indikator perekaman berkedip di Tab Monitor
 [x] Startup Rekaman Instan - Penghapusan cooldown dan optimasi parameter RTSP FFmpeg untuk start perekaman seketika
 [x] add: merge disk, fitur untuk pakai 2 local disk yang beda, ini di tentuin di agent saja
-[x] add: auto update versi terbaru agar tidak perlu reinstall 
-[x] add: tampilkan tanda di  history yang video nya udah otomatis terhapus karena melewati clipRetentionDays
-[x] bisa streaming video yang tersimpan di agent dari komputer mana saja asal satu jaringan
+[x] add: auto update versi terbaru agar tidak perlu reinstall — feed dari BuktiScan_UPDATE_URL / BuktiScan_WEB_URL (tanpa IP hardcode)
+[x] add: tampilkan tanda di history yang video nya udah otomatis terhapus karena melewati clipRetentionDays — sync clipPurgedAt ke backend + badge di web & agent
+[x] bisa streaming video yang tersimpan di agent dari komputer penyimpan dan di tonton dari website — LAN IP dari heartbeat, bukan 127.0.0.1
+
+## Syarat streaming web (ops / monitor) — segera pastikan
+
+[ ] Agent online + heartbeat (laporkan LAN IP ke backend)
+[ ] Browser dashboard & PC kasir (agent) berada di LAN yang sama
+[ ] Firewall PC kasir izinkan inbound port 19500 (media clip agent)
+[ ] Restart backend + agent setelah deploy fitur LAN streaming

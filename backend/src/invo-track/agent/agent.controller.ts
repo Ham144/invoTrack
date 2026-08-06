@@ -17,6 +17,7 @@ import {
   AgentIngestDto,
   AgentPairDto,
   AgentPairUsbDto,
+  AgentPurgeClipsDto,
   AgentReconcileClipsDto,
   UpdateAgentSettingsDto,
 } from './dto/agent.dto';
@@ -91,6 +92,15 @@ export class AgentController {
     @Body() dto: AgentReconcileClipsDto,
   ) {
     return this.service.reconcileClips(agent, dto.clips);
+  }
+
+  @UseGuards(AgentAuthGuard)
+  @Post('clips/purged')
+  markClipsPurged(
+    @AgentAuth() agent: AgentContext,
+    @Body() dto: AgentPurgeClipsDto,
+  ) {
+    return this.service.markClipsPurged(agent, dto.invoiceNumbers);
   }
 
   @UseGuards(AgentAuthGuard)

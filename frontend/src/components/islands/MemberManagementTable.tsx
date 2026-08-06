@@ -275,7 +275,10 @@ export default function MemberManagementTable() {
         </div>
       </section>
 
-      <dialog className={`modal ${editTarget ? "modal-open" : ""}`} open={!!editTarget}>
+      <dialog
+        className={`modal ${editTarget ? "modal-open" : ""}`}
+        open={!!editTarget}
+      >
         <div className="modal-box">
           <h3 className="font-bold">Edit {editTarget?.username}</h3>
           <div className="py-4 grid gap-3">

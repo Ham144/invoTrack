@@ -13,6 +13,12 @@ import { FfmpegService } from './ffmpeg.service';
 import { BuktiScanGateway } from './invo-track.gateway';
 import { RecordingTimerService } from './recording-timer.service';
 import { Prisma } from '@prisma/client';
+import {
+  buildAgentClipUrl,
+  DEFAULT_AGENT_MEDIA_PORT,
+  rewriteAgentClipUrl,
+  sanitizeLanIp,
+} from './agent/agent-media-url';
 
 const scanInclude = {
   cctvConfig: { select: { id: true, label: true } },
@@ -71,36 +77,72 @@ export interface AgentActiveRecordingRow {
 
 @Injectable()
 export class InvoiceScanService {
-  private static workstationIps = new Map<string, string>();
+  private static workstationMedia = new Map<
+    string,
+    { lanIp: string; mediaPort: number }
+  >();
 
-  static setWorkstationIp(workstationId: string, ip: string) {
+  static setWorkstationMedia(
+    workstationId: string,
+    ip: string,
+    mediaPort: number = DEFAULT_AGENT_MEDIA_PORT,
+  ) {
     if (!workstationId || !ip) return;
-    let cleanIp = ip.trim();
-    if (cleanIp.startsWith('::ffff:')) {
-      cleanIp = cleanIp.substring(7);
-    }
-    if (cleanIp === '::1') {
-      cleanIp = '127.0.0.1';
-    }
-    this.workstationIps.set(workstationId, cleanIp);
+    const cleanIp = sanitizeLanIp(ip);
+    if (!cleanIp) return;
+    this.workstationMedia.set(workstationId, {
+      lanIp: cleanIp,
+      mediaPort:
+        Number.isFinite(mediaPort) && mediaPort > 0
+          ? Math.round(mediaPort)
+          : DEFAULT_AGENT_MEDIA_PORT,
+    });
+  }
+
+  /** @deprecated use setWorkstationMedia */
+  static setWorkstationIp(workstationId: string, ip: string) {
+    this.setWorkstationMedia(workstationId, ip);
+  }
+
+  static getWorkstationMedia(
+    workstationId: string,
+  ): { lanIp: string; mediaPort: number } | null {
+    return this.workstationMedia.get(workstationId) || null;
   }
 
   static getWorkstationIp(workstationId: string): string | null {
-    return this.workstationIps.get(workstationId) || null;
+    return this.workstationMedia.get(workstationId)?.lanIp || null;
   }
 
-  private mapScanIp<T extends { videoPath?: string | null; workstationId?: string | null }>(scan: T): T {
-    if (!scan || !scan.videoPath || !scan.workstationId) return scan;
-    if (scan.videoPath.includes('127.0.0.1')) {
-      const ip = InvoiceScanService.getWorkstationIp(scan.workstationId);
-      if (ip && ip !== '127.0.0.1') {
-        return {
-          ...scan,
-          videoPath: scan.videoPath.replace('127.0.0.1', ip),
-        };
-      }
-    }
-    return scan;
+  private mapScanMedia<
+    T extends {
+      videoPath?: string | null;
+      workstationId?: string | null;
+      recordingSource?: string | null;
+      localClipPath?: string | null;
+    },
+  >(
+    scan: T,
+    mediaByWs?: Map<string, { lanIp: string; mediaPort: number }>,
+  ): T {
+    if (!scan?.workstationId || !scan.videoPath) return scan;
+    const isEdge =
+      scan.recordingSource === RecordingSource.EDGE ||
+      Boolean(scan.localClipPath);
+    if (!isEdge) return scan;
+
+    const media =
+      mediaByWs?.get(scan.workstationId) ??
+      InvoiceScanService.getWorkstationMedia(scan.workstationId);
+    if (!media) return scan;
+
+    const rewritten = rewriteAgentClipUrl(
+      scan.videoPath,
+      media.lanIp,
+      media.mediaPort,
+    );
+    if (rewritten === scan.videoPath) return scan;
+    return { ...scan, videoPath: rewritten };
   }
 
   private completing = new Set<string>();
@@ -113,6 +155,51 @@ export class InvoiceScanService {
     private readonly recordingTimer: RecordingTimerService,
   ) {}
 
+  private async loadWorkstationMedia(
+    workstationIds: string[],
+  ): Promise<Map<string, { lanIp: string; mediaPort: number }>> {
+    const ids = [...new Set(workstationIds.filter(Boolean))];
+    const map = new Map<string, { lanIp: string; mediaPort: number }>();
+    for (const id of ids) {
+      const mem = InvoiceScanService.getWorkstationMedia(id);
+      if (mem) map.set(id, mem);
+    }
+    const missing = ids.filter((id) => !map.has(id));
+    if (missing.length === 0) return map;
+
+    const devices = await this.prisma.agentDevice.findMany({
+      where: { workstationId: { in: missing } },
+      select: { workstationId: true, lanIp: true, mediaPort: true },
+    });
+    for (const d of devices) {
+      const lanIp = sanitizeLanIp(d.lanIp);
+      if (!lanIp) continue;
+      const media = {
+        lanIp,
+        mediaPort: d.mediaPort || DEFAULT_AGENT_MEDIA_PORT,
+      };
+      map.set(d.workstationId, media);
+      InvoiceScanService.setWorkstationMedia(
+        d.workstationId,
+        media.lanIp,
+        media.mediaPort,
+      );
+    }
+    return map;
+  }
+
+  private async resolveAgentClipUrl(
+    workstationId: string,
+    invoiceNumber: string,
+  ): Promise<string | null> {
+    const mediaMap = await this.loadWorkstationMedia([workstationId]);
+    const media = mediaMap.get(workstationId);
+    return buildAgentClipUrl(
+      media?.lanIp,
+      invoiceNumber,
+      media?.mediaPort ?? DEFAULT_AGENT_MEDIA_PORT,
+    );
+  }
   async list(userInfo: TokenPayload, query: ScanListQuery = {}) {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 20));
@@ -176,7 +263,10 @@ export class InvoiceScanService {
       this.prisma.invoiceScan.count({ where }),
     ]);
 
-    const mappedItems = items.map((item) => this.mapScanIp(item));
+    const mediaByWs = await this.loadWorkstationMedia(
+      items.map((i) => i.workstationId).filter((id): id is string => !!id),
+    );
+    const mappedItems = items.map((item) => this.mapScanMedia(item, mediaByWs));
     return { items: mappedItems, total, page, limit };
   }
 
@@ -204,7 +294,10 @@ export class InvoiceScanService {
       include: scanInclude,
     });
     if (!scan) throw new NotFoundException('Invoice tidak ditemukan');
-    return this.mapScanIp(scan);
+    const mediaByWs = await this.loadWorkstationMedia(
+      scan.workstationId ? [scan.workstationId] : [],
+    );
+    return this.mapScanMedia(scan, mediaByWs);
   }
 
   async listActiveRecordings(
@@ -487,8 +580,10 @@ export class InvoiceScanService {
 
     this.recordingTimer.cancel(scanId);
 
-    const safeName = scan.invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
-    const agentClipUrl = `http://127.0.0.1:19500/clips/${safeName}.mp4`;
+    const agentClipUrl = await this.resolveAgentClipUrl(
+      workstationId,
+      scan.invoiceNumber,
+    );
 
     const updated = await this.prisma.invoiceScan.update({
       where: { id: scanId },
@@ -497,6 +592,7 @@ export class InvoiceScanService {
         completedAt: new Date(),
         localClipPath,
         videoPath: agentClipUrl,
+        clipPurgedAt: null,
         stopRequestedAt: null,
       },
       include: scanInclude,
@@ -603,7 +699,10 @@ export class InvoiceScanService {
         continue;
       }
 
-      const safeName = normalized.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const agentClipUrl = await this.resolveAgentClipUrl(
+        workstationId,
+        normalized,
+      );
       await this.prisma.invoiceScan.create({
         data: {
           organizationName,
@@ -615,7 +714,8 @@ export class InvoiceScanService {
           scannerConfigId: defaultScanner.id,
           scannedByUsername: defaultScanner.assignedUsername,
           localClipPath: clip.localClipPath,
-          videoPath: `http://127.0.0.1:19500/clips/${safeName}.mp4`,
+          videoPath: agentClipUrl,
+          clipPurgedAt: null,
           scannedAt: new Date(),
           completedAt: new Date(),
         },
@@ -629,6 +729,114 @@ export class InvoiceScanService {
     }
 
     return { completed, imported, skipped };
+  }
+
+  async markClipsPurgedFromAgent(
+    organizationName: string,
+    workstationId: string,
+    invoiceNumbers: string[],
+  ) {
+    const normalized = [
+      ...new Set(
+        invoiceNumbers
+          .map((n) => n.trim().toUpperCase())
+          .filter(Boolean),
+      ),
+    ];
+    if (normalized.length === 0) {
+      return { updated: 0 };
+    }
+
+    const candidates = await this.prisma.invoiceScan.findMany({
+      where: {
+        organizationName,
+        workstationId,
+        status: InvoiceScanStatus.COMPLETED,
+        clipPurgedAt: null,
+      },
+      select: { id: true, invoiceNumber: true },
+    });
+
+    const exact = new Set(normalized);
+    const safe = new Set(
+      normalized.map((n) => n.replace(/[^a-zA-Z0-9_-]/g, '_')),
+    );
+    const ids = candidates
+      .filter((row) => {
+        const inv = row.invoiceNumber.toUpperCase();
+        return (
+          exact.has(inv) ||
+          safe.has(inv.replace(/[^a-zA-Z0-9_-]/g, '_'))
+        );
+      })
+      .map((row) => row.id);
+
+    if (ids.length === 0) {
+      return { updated: 0 };
+    }
+
+    const result = await this.prisma.invoiceScan.updateMany({
+      where: { id: { in: ids } },
+      data: {
+        clipPurgedAt: new Date(),
+        localClipPath: null,
+        videoPath: null,
+      },
+    });
+
+    if (result.count > 0) {
+      this.gateway.emitScanLogUpdate(organizationName);
+    }
+
+    return { updated: result.count };
+  }
+
+  /**
+   * Fill missing / localhost EDGE videoPath once agent reports a reachable LAN IP.
+   */
+  async backfillEdgeClipUrls(
+    organizationName: string,
+    workstationId: string,
+    lanIp: string,
+    mediaPort: number = DEFAULT_AGENT_MEDIA_PORT,
+  ) {
+    const host = sanitizeLanIp(lanIp);
+    if (!host) return { updated: 0 };
+
+    const rows = await this.prisma.invoiceScan.findMany({
+      where: {
+        organizationName,
+        workstationId,
+        status: InvoiceScanStatus.COMPLETED,
+        recordingSource: RecordingSource.EDGE,
+        clipPurgedAt: null,
+        OR: [
+          { videoPath: null },
+          { videoPath: { contains: '127.0.0.1' } },
+          { videoPath: { contains: 'localhost' } },
+        ],
+      },
+      select: { id: true, invoiceNumber: true, videoPath: true },
+      take: 200,
+    });
+
+    let updated = 0;
+    for (const row of rows) {
+      const nextUrl =
+        buildAgentClipUrl(host, row.invoiceNumber, mediaPort) ??
+        rewriteAgentClipUrl(row.videoPath, host, mediaPort);
+      if (!nextUrl || nextUrl === row.videoPath) continue;
+      await this.prisma.invoiceScan.update({
+        where: { id: row.id },
+        data: { videoPath: nextUrl },
+      });
+      updated += 1;
+    }
+
+    if (updated > 0) {
+      this.gateway.emitScanLogUpdate(organizationName);
+    }
+    return { updated };
   }
 
   async ingestEdge(
@@ -692,6 +900,7 @@ export class InvoiceScanService {
         completedAt: null,
         videoPath: null,
         localClipPath: null,
+        clipPurgedAt: null,
         stopRequestedAt: null,
       },
       update: {
@@ -706,6 +915,7 @@ export class InvoiceScanService {
         completedAt: null,
         videoPath: null,
         localClipPath: null,
+        clipPurgedAt: null,
         stopRequestedAt: null,
       },
       include: scanInclude,

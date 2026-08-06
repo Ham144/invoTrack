@@ -12,6 +12,7 @@ loadAgentEnv();
 export interface AgentConfig {
   apiBaseUrl: string;
   deviceToken?: string;
+  pairingCode?: string;
   workstationId?: string;
   organizationName?: string;
   workstationLabel?: string;
@@ -51,6 +52,7 @@ export function loadConfig(): AgentConfig {
         clipsDir: raw.clipsDir || defaultClipsDir(),
         clipsDirSecondary: raw.clipsDirSecondary,
         deviceToken: raw.deviceToken,
+        pairingCode: raw.pairingCode,
         workstationId: raw.workstationId,
         organizationName: raw.organizationName,
         workstationLabel: raw.workstationLabel,
