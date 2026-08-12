@@ -13,7 +13,6 @@ Agent Progress & Features Checklist:
 [x] add: auto update versi terbaru agar tidak perlu reinstall — feed dari BuktiScan_UPDATE_URL / BuktiScan_WEB_URL (tanpa IP hardcode)
 [x] add: tampilkan tanda di history yang video nya udah otomatis terhapus karena melewati clipRetentionDays — sync clipPurgedAt ke backend + badge di web & agent
 [x] bisa streaming video yang tersimpan di agent dari komputer penyimpan dan di tonton dari website — LAN IP dari heartbeat, bukan 127.0.0.1
-
 ## Syarat streaming web (ops / monitor) — segera pastikan
 
 [ ] Agent online + heartbeat (laporkan LAN IP ke backend)

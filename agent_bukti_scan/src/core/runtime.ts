@@ -26,8 +26,9 @@ import {
   TtsOptions,
 } from "./tts";
 import { agentMediaPort, detectLanIp } from "./lan-ip";
+import { APP_VERSION } from "./app-version";
 
-export const AGENT_VERSION = "1.0.0";
+export const AGENT_VERSION = APP_VERSION;
 
 export interface ScannerLinkStatus {
   id: string;

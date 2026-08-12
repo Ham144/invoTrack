@@ -15,8 +15,7 @@ import { TabScanner } from "./components/TabScanner";
 import { TabPenyimpanan } from "./components/TabPenyimpanan";
 import { TabTentang } from "./components/TabTentang";
 import { TabRiwayat } from "./components/TabRiwayat";
-
-const AGENT_VERSION = "0.1.3";
+import { APP_VERSION } from "../core/app-version";
 
 export type Tab =
   | "beranda"
@@ -316,7 +315,7 @@ export default function App() {
   return (
     <div style={pageStyle}>
       <div style={S.header}>
-        <span style={S.headerTitle}>BuktiScan Agent v{AGENT_VERSION}</span>
+        <span style={S.headerTitle}>BuktiScan Agent v{APP_VERSION}</span>
         <div style={{ display: "flex", alignItems: "center" }}>
           <span style={{ fontSize: 12, opacity: 0.8 }}>
             {status.recording ? (
@@ -426,8 +425,8 @@ export default function App() {
         {tab === "tentang" && (
           <TabTentang
             config={config}
-            agentVersion={AGENT_VERSION}
-            onUnpair={onUnpair}
+            agentVersion={APP_VERSION}
+            onunpai
           />
         )}
       </div>

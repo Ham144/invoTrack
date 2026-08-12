@@ -27,7 +27,7 @@ function DashboardHomeContent() {
     const id = window.setInterval(() => tick((n) => n + 1), 1000);
     return () => window.clearInterval(id);
   }, []);
-
+  
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["dashboard-summary", "landing"],
     queryFn: async () => {
